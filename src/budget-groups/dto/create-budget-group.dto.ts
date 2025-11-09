@@ -19,7 +19,7 @@ export class CreateBudgetGroupDto {
   @IsString()
   footerLabel?: string;
 
- @IsDefined()
+  @IsOptional()
   @IsString()
-  userId: string;
+  userId?: string;
 }

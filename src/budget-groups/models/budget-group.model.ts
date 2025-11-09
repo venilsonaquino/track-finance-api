@@ -15,7 +15,7 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
   @PrimaryKey
   @Column({
     type: 'VARCHAR(26)',
-    defaultValue: ulid(),
+    defaultValue: ulid,
   })
   id: string;
 

@@ -1,20 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
 import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
 import { Op } from 'sequelize';
+import { LoggerService } from 'src/config/logging/logger.service';
 
 @Injectable()
 export class BudgetGroupsService {
   constructor(
     @InjectModel(BudgetGroupModel)
     private readonly model: typeof BudgetGroupModel,
+    @Inject(LoggerService)
+    private readonly logger: LoggerService,
   ) {}
 
   async create(createDto: CreateBudgetGroupDto) {
     try {
-      return await this.model.create(createDto as any);
+      return await this.model.create(createDto);
     } catch (error) {
       throw Error(error);
     }
@@ -61,8 +64,9 @@ export class BudgetGroupsService {
 
   async createMany(dtos: CreateBudgetGroupDto[]): Promise<void> {
     try {
-      await this.model.bulkCreate(dtos as any[]);
+      await this.model.bulkCreate(dtos);
     } catch (error) {
+      this.logger.error('Error creating budget groups', error);
       throw Error(error);
     }
   }
