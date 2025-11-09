@@ -14,7 +14,7 @@ export class CategoryModel extends Model<CategoryModel> {
   @PrimaryKey
   @Column({
     type: 'VARCHAR(26)',
-    defaultValue: ulid(),
+    defaultValue: ulid,
   })
   id: string;
 
