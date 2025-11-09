@@ -57,4 +57,13 @@ export class BudgetGroupsService {
     }
     return;
   }
+
+
+  async createMany(dtos: CreateBudgetGroupDto[]): Promise<void> {
+    try {
+      await this.model.bulkCreate(dtos as any[]);
+    } catch (error) {
+      throw Error(error);
+    }
+  }
 }
