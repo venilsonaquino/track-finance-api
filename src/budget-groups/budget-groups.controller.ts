@@ -14,6 +14,7 @@ import {
 import { BudgetGroupsService } from './budget-groups.service';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
 import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
+import { SyncAssignmentsDto } from './dto/sync-assignments.dto';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 
 @UseGuards(AuthGuard)
@@ -49,6 +50,13 @@ export class BudgetGroupsController {
     const { user } = req;
     updateDto.userId = user.id;
     return await this.budgetGroupsService.update(id, updateDto);
+  }
+
+  @Post('assignments')
+  async syncAssignments(@Body() body: SyncAssignmentsDto, @Request() req) {
+    const { user } = req;
+    await this.budgetGroupsService.syncCategoryAssignments(body, user.id);
+    return { success: true };
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

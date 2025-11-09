@@ -6,6 +6,8 @@ import {
   Table,
 } from 'sequelize-typescript';
 import { ulid } from 'ulid';
+import { ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { BudgetGroupModel } from 'src/budget-groups/models/budget-group.model';
 
 @Table({
   tableName: 'categories',
@@ -39,7 +41,7 @@ export class CategoryModel extends Model<CategoryModel> {
   @Column({
     type: DataType.STRING,
     allowNull: true,
-    defaultValue: '#007BFF',
+    defaultValue: '#615fff',
   })
   color: string;
 
@@ -49,4 +51,15 @@ export class CategoryModel extends Model<CategoryModel> {
     allowNull: true,
   })
   userId: string;
+
+  @ForeignKey(() => BudgetGroupModel)
+  @Column({
+    field: 'budget_group_id',
+    type: 'VARCHAR(26)',
+    allowNull: true,
+  })
+  budgetGroupId: string;
+
+  @BelongsTo(() => BudgetGroupModel)
+  budgetGroup: BudgetGroupModel;
 }

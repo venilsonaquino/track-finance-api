@@ -6,6 +6,8 @@ import {
   Table,
 } from 'sequelize-typescript';
 import { ulid } from 'ulid';
+import { HasMany } from 'sequelize-typescript';
+import { CategoryModel } from 'src/categories/models/category.model';
 import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 
 @Table({
@@ -52,4 +54,7 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
     allowNull: true,
   })
   userId: string;
+
+  @HasMany(() => CategoryModel)
+  categories: CategoryModel[];
 }

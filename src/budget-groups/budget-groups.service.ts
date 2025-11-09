@@ -1,19 +1,25 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
 import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import { LoggerService } from 'src/config/logging/logger.service';
+import { CategoryModel } from 'src/categories/models/category.model';
+import { SyncAssignmentsDto } from './dto/sync-assignments.dto';
 
 @Injectable()
 export class BudgetGroupsService {
   constructor(
     @InjectModel(BudgetGroupModel)
     private readonly model: typeof BudgetGroupModel,
+    @InjectModel(CategoryModel)
+    private readonly categoryModel: typeof CategoryModel,
     @Inject(LoggerService)
     private readonly logger: LoggerService,
   ) {}
+  
+  private readonly sequelize: Sequelize = this.model.sequelize as Sequelize;
 
   async create(createDto: CreateBudgetGroupDto) {
     try {
@@ -26,7 +32,7 @@ export class BudgetGroupsService {
   async findAllByUser(userId: string) {
     return await this.model.findAll({
       where: {
-        [Op.or]: [{ userId }, { userId: null }],
+        [Op.or]: [{ userId }],
       },
       order: [['created_at', 'DESC']],
     });
@@ -61,13 +67,46 @@ export class BudgetGroupsService {
     return;
   }
 
-
-  async createMany(dtos: CreateBudgetGroupDto[]): Promise<void> {
+  async createMany(dtos: CreateBudgetGroupDto[]) {
     try {
-      await this.model.bulkCreate(dtos);
+      var created = await this.model.bulkCreate(dtos as any[]);
+      return created;
     } catch (error) {
       this.logger.error('Error creating budget groups', error);
       throw Error(error);
+    }
+  }
+
+  async syncCategoryAssignments(
+    syncAssignmentsDto: SyncAssignmentsDto,
+    userId: string,
+  ): Promise<void> {
+    try {
+      await this.sequelize.transaction(async (tx) => {
+        const categoryIds = syncAssignmentsDto.assignments.map((a) => a.categoryId);
+        const categories = await this.categoryModel.findAll(
+          { where: { 
+              id: categoryIds, 
+              [Op.or]: [{ userId }, { userId: null }] 
+            }, 
+            transaction: tx 
+          });
+
+          syncAssignmentsDto.assignments.forEach(assignment => {
+              categories.forEach(category => {
+                  if (category.id === assignment.categoryId) {
+                      category.budgetGroupId = assignment.budgetGroupId;
+                  }
+              });
+          });
+
+          var updated = await Promise.all(categories.map(category => category.save({ transaction: tx })));
+          return updated;
+      });
+    } catch (error) {
+      this.logger.error('Error syncing category assignments', error);
+      if (error instanceof NotFoundException) throw error;
+      throw new InternalServerErrorException('Error syncing category assignments');
     }
   }
 }
