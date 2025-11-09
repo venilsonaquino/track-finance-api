@@ -6,6 +6,7 @@ import {
   Table,
 } from 'sequelize-typescript';
 import { ulid } from 'ulid';
+import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 
 @Table({
   tableName: 'budget_groups',
@@ -22,14 +23,28 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
     type: DataType.STRING,
     allowNull: false,
   })
-  description: string;
+  title: string;
+
+  @Column({
+    type: DataType.ENUM,
+    values: [BudgetGroupKind.COMPUTED, BudgetGroupKind.EDITABLE],
+    defaultValue: BudgetGroupKind.EDITABLE,
+  })
+  kind: BudgetGroupKind;
 
   @Column({
     type: DataType.STRING,
     allowNull: true,
-    defaultValue: '#007BFF',
+    defaultValue: '#0084d1',
   })
   color: string;
+
+  @Column({
+    field: 'footer_label',
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  footerLabel: string;
 
   @Column({
     field: 'user_id',
