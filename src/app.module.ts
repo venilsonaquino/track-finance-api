@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CategoriesModule } from './categories/categories.module';
+import { BudgetGroupsModule } from './budget-groups/budget-groups.module';
 import { FilesModule } from './files/files.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -47,6 +48,7 @@ import { LoggerModule } from './config/logging/logger.module';
     UsersModule,
     TransactionsModule,
     CategoriesModule,
+  BudgetGroupsModule,
     FilesModule,
     WalletsModule,
   ],
