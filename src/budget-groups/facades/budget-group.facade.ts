@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetGroupsService } from '../budget-groups.service';
 import { CreateBudgetGroupDto } from '../dto/create-budget-group.dto';
+import { SyncCategoryAssignmentsDto } from '../dto/sync-category-assignments.dto';
 
 @Injectable()
 export class BudgetGroupFacade {
@@ -8,5 +9,13 @@ export class BudgetGroupFacade {
 
   async createBudgetGroup(dtos: CreateBudgetGroupDto[]): Promise<void> {
     await this.service.createMany(dtos);
+  }
+
+  async findAllByUser(userId: string) {
+    return this.service.findAllByUser(userId);
+  }
+
+  async syncCategoryAssignments(syncDto: SyncCategoryAssignmentsDto, userId: string) {
+    return this.service.syncCategoryAssignments(syncDto, userId);
   }
 }

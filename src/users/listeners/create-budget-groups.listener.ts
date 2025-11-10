@@ -14,8 +14,8 @@ export class CreateBudgetGroupsListener {
   @OnEvent('user.created')
   async handleUserCreatedEvent(payload: { userId: string }) {
     const defaultBudgetGroups = [
-      { title: 'SALDO', kind: BudgetGroupKind.COMPUTED, color: '#18181b', footerLabel: 'Saldo', userId: payload.userId },
-      { title: 'RECEITAS', kind: BudgetGroupKind.EDITABLE, color: '#00bc7d', footerLabel: 'Receitas', userId: payload.userId },
+      { title: 'SALDO', kind: BudgetGroupKind.COMPUTED, color: '#18181b', footerLabel: 'Saldo', userId: payload.userId, isSystemDefault: true },
+      { title: 'RECEITAS', kind: BudgetGroupKind.EDITABLE, color: '#00bc7d', footerLabel: 'Receitas', userId: payload.userId, isSystemDefault: true },
     ];
 
     await this.budgetGroupFacade.createBudgetGroup(defaultBudgetGroups);

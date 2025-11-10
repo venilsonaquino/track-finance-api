@@ -20,6 +20,9 @@ export class CreateBudgetGroupDto {
   footerLabel?: string;
 
   @IsOptional()
+  isSystemDefault?: boolean;
+
+  @IsOptional()
   @IsString()
   userId?: string;
 }

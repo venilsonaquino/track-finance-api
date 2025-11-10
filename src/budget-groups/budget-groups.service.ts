@@ -61,6 +61,10 @@ export class BudgetGroupsService {
   }
 
   async remove(id: string, userId: string) {
+    const group = await this.findOne(id, userId);
+    if (group.isSystemDefault) {
+      throw new InternalServerErrorException('Cannot delete system budget groups');
+    }
     const deletedCount = await this.model.destroy({ where: { id, userId } });
     if (deletedCount === 0) {
       throw new NotFoundException(`Budget group with id ${id} not found`);

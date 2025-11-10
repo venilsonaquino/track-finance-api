@@ -49,6 +49,13 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
   footerLabel: string;
 
   @Column({
+    field: 'is_system_default',
+    type: DataType.BOOLEAN,
+    defaultValue: false,
+  })
+  isSystemDefault: boolean;
+
+  @Column({
     field: 'user_id',
     type: 'VARCHAR(26)',
     allowNull: true,
