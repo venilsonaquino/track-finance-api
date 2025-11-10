@@ -19,6 +19,6 @@ export class CreateBudgetGroupsListener {
     ];
 
     await this.budgetGroupFacade.createBudgetGroup(defaultBudgetGroups);
-    this.logger.log(`Default budget groups created for user ${payload.userId}`);
+    this.logger.log(`Default budget groups created for user ${payload.userId}`, 'CreateBudgetGroupsListener');
   }
 }

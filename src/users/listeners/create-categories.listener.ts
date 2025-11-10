@@ -5,10 +5,15 @@ import { CategoryFacade } from 'src/categories/facades/category.facade';
 import { CreateCategoryDto } from 'src/categories/dto/create-category.dto';
 import { BudgetGroupFacade } from 'src/budget-groups/facades/budget-group.facade';
 import { SyncCategoryAssignmentsDto } from 'src/budget-groups/dto/sync-category-assignments.dto';
+import { LoggerService } from 'src/config/logging/logger.service';
 
 @Injectable()
 export class CreateCategoriesListener {
-  constructor(private readonly categoryFacade: CategoryFacade, private readonly budgetGroupFacade: BudgetGroupFacade) {}
+  constructor(
+    private readonly categoryFacade: CategoryFacade, 
+    private readonly budgetGroupFacade: BudgetGroupFacade, 
+    private readonly logger: LoggerService
+  ) {}
 
   @OnEvent('user.created')
   async handleUserCreatedEvent(event: UserCreatedEvent) {
@@ -183,5 +188,7 @@ export class CreateCategoriesListener {
         await this.budgetGroupFacade.syncCategoryAssignments(syncDto, event.userId);
       }
     }
+
+    this.logger.log(`Default budget categories created for user ${event.userId}`, 'CreateCategoriesListener');
   }
 }
