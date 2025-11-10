@@ -6,7 +6,7 @@ import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
 import { Op, Sequelize } from 'sequelize';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { CategoryModel } from 'src/categories/models/category.model';
-import { SyncAssignmentsDto } from './dto/sync-assignments.dto';
+import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 
 @Injectable()
 export class BudgetGroupsService {
@@ -34,6 +34,7 @@ export class BudgetGroupsService {
       where: {
         [Op.or]: [{ userId }],
       },
+      include: [{ model: this.categoryModel, as: 'categories' }],
       order: [['created_at', 'DESC']],
     });
   }
@@ -78,7 +79,7 @@ export class BudgetGroupsService {
   }
 
   async syncCategoryAssignments(
-    syncAssignmentsDto: SyncAssignmentsDto,
+    syncAssignmentsDto: SyncCategoryAssignmentsDto,
     userId: string,
   ): Promise<void> {
     try {

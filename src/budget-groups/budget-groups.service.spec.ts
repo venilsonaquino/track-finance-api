@@ -5,7 +5,7 @@ import { BudgetGroupsService } from './budget-groups.service';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { LoggerService } from 'src/config/logging/logger.service';
-import { SyncAssignmentsDto } from './dto/sync-assignments.dto';
+import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 import { ulid } from 'ulid';
 
 describe('BudgetGroupsService', () => {
@@ -76,7 +76,7 @@ describe('BudgetGroupsService', () => {
 
     it('should successfully sync category assignments', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [
           { categoryId: categoryId1, budgetGroupId },
           { categoryId: categoryId2, budgetGroupId },
@@ -111,7 +111,7 @@ describe('BudgetGroupsService', () => {
 
     it('should set budgetGroupId to null when not provided', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [{ categoryId: categoryId1, budgetGroupId: null }],
       };
 
@@ -133,7 +133,7 @@ describe('BudgetGroupsService', () => {
 
     it('should handle empty assignments gracefully', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [],
       };
 
@@ -149,7 +149,7 @@ describe('BudgetGroupsService', () => {
 
     it('should ignore assignments for categories not found', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [
           { categoryId: categoryId1, budgetGroupId },
           { categoryId: categoryId2, budgetGroupId },
@@ -175,7 +175,7 @@ describe('BudgetGroupsService', () => {
 
     it('should rollback transaction on error during save', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [{ categoryId: categoryId1, budgetGroupId }],
       };
 
@@ -207,7 +207,7 @@ describe('BudgetGroupsService', () => {
 
     it('should rethrow NotFoundException from findAll', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [{ categoryId: categoryId1, budgetGroupId }],
       };
 
@@ -236,7 +236,7 @@ describe('BudgetGroupsService', () => {
     it('should update multiple categories with different budgetGroupIds', async () => {
       // Arrange
       const budgetGroupId2 = 'budget-group-456';
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [
           { categoryId: categoryId1, budgetGroupId },
           { categoryId: categoryId2, budgetGroupId: budgetGroupId2 },
@@ -278,7 +278,7 @@ describe('BudgetGroupsService', () => {
 
     it('should handle duplicate categoryIds in assignments', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [
           { categoryId: categoryId1, budgetGroupId },
           { categoryId: categoryId1, budgetGroupId }, // duplicate
@@ -303,7 +303,7 @@ describe('BudgetGroupsService', () => {
 
     it('should respect user isolation (only update own or global categories)', async () => {
       // Arrange
-      const syncDto: SyncAssignmentsDto = {
+      const syncDto: SyncCategoryAssignmentsDto = {
         assignments: [{ categoryId: categoryId1, budgetGroupId }],
       };
 

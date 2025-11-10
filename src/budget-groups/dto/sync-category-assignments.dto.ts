@@ -10,7 +10,7 @@ class AssignmentItem {
   budgetGroupId?: string | null;
 }
 
-export class SyncAssignmentsDto {
+export class SyncCategoryAssignmentsDto {
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
