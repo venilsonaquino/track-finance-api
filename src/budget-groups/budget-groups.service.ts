@@ -7,6 +7,15 @@ import { Op, Sequelize } from 'sequelize';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
+import { TransactionModel } from 'src/transactions/models/transaction.model';
+import { 
+  BudgetOverviewDto, 
+  BudgetSectionComputed, 
+  BudgetSectionEditable, 
+  MonthlyValues, 
+  createZeroYear 
+} from './dto/budget-overview.dto';
+import { BudgetGroupKind } from './enum/BudgetGroupKind';
 
 @Injectable()
 export class BudgetGroupsService {
@@ -15,6 +24,8 @@ export class BudgetGroupsService {
     private readonly model: typeof BudgetGroupModel,
     @InjectModel(CategoryModel)
     private readonly categoryModel: typeof CategoryModel,
+    @InjectModel(TransactionModel)
+    private readonly transactionModel: typeof TransactionModel,
     @Inject(LoggerService)
     private readonly logger: LoggerService,
   ) {}
@@ -35,7 +46,15 @@ export class BudgetGroupsService {
         [Op.or]: [{ userId }],
       },
       include: [{ model: this.categoryModel, as: 'categories' }],
-      order: [['created_at', 'DESC']],
+      order: [
+        ['isSystemDefault', 'DESC'], // System defaults first
+        [this.sequelize.literal(`CASE 
+          WHEN title = 'SALDO' THEN 1 
+          WHEN title = 'RECEITAS' THEN 2 
+          ELSE 3 
+        END`), 'ASC'], // SALDO first, then RECEITAS, then others
+        ['created_at', 'DESC']
+      ],
     });
   }
 
@@ -113,5 +132,98 @@ export class BudgetGroupsService {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException('Error syncing category assignments');
     }
+  }
+
+  async getBudgetOverview(userId: string, year: number = 2025): Promise<BudgetOverviewDto> {
+    try {
+      // Fetch all budget groups with their categories
+      const budgetGroups = await this.model.findAll({
+        where: {
+          [Op.or]: [{ userId }],
+        },
+        include: [{ 
+          model: this.categoryModel, 
+          as: 'categories',
+          include: [{
+            model: this.transactionModel,
+            as: 'transactions',
+            where: {
+              userId,
+              depositedDate: {
+                [Op.between]: [`${year}-01-01`, `${year}-12-31`]
+              }
+            },
+            required: false
+          }]
+        }],
+        order: [
+          ['isSystemDefault', 'DESC'],
+          [this.sequelize.literal(`CASE 
+            WHEN title = 'SALDO' THEN 1 
+            WHEN title = 'RECEITAS' THEN 2 
+            ELSE 3 
+          END`), 'ASC'],
+          ['created_at', 'DESC']
+        ],
+      });
+
+      // Separate computed and editable sections
+      const computedGroup = budgetGroups.find(group => group.kind === BudgetGroupKind.COMPUTED);
+      const editableGroups = budgetGroups.filter(group => group.kind === BudgetGroupKind.EDITABLE);
+
+      // Build sections computed
+      const sectionsComputed: BudgetSectionComputed = {
+        id: computedGroup?.id,
+        title: computedGroup?.title,
+        kind: 'computed',
+        color: computedGroup?.color,
+        footerLabel: computedGroup?.footerLabel || `Total ${computedGroup?.title}`,
+        rows: editableGroups.map(group => ({
+          id: group.id,
+          label: group.title,
+          refSectionTitle: group.title
+        }))
+      };
+
+      // Build sections editable
+      const sectionsEditable: BudgetSectionEditable[] = editableGroups.map(group => ({
+        id: group.id,
+        title: group.title,
+        kind: 'editable',
+        color: group.color,
+        footerLabel: group.footerLabel || `Total ${group.title}`,
+        rows: group.categories?.map(category => ({
+          id: category.id,
+          label: category.name,
+          values: this.calculateMonthlyValues(category.transactions || [], year)
+        })) || []
+      }));
+
+      return new BudgetOverviewDto({
+        year,
+        sectionsComputed,
+        sectionsEditable
+      });
+
+    } catch (error) {
+      this.logger.error('Error getting budget overview', error);
+      throw new InternalServerErrorException('Error getting budget overview');
+    }
+  }
+
+  private calculateMonthlyValues(transactions: any[], year: number): MonthlyValues {
+    const monthlyValues = createZeroYear();
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    transactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.depositedDate);
+      if (transactionDate.getFullYear() === year) {
+        const monthIndex = transactionDate.getMonth();
+        const monthKey = monthNames[monthIndex] as keyof MonthlyValues;
+        monthlyValues[monthKey] += Math.abs(transaction.amount);
+      }
+    });
+
+    return monthlyValues;
   }
 }

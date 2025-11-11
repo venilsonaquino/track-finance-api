@@ -6,8 +6,9 @@ import {
   Table,
 } from 'sequelize-typescript';
 import { ulid } from 'ulid';
-import { ForeignKey, BelongsTo } from 'sequelize-typescript';
+import { ForeignKey, BelongsTo, HasMany } from 'sequelize-typescript';
 import { BudgetGroupModel } from 'src/budget-groups/models/budget-group.model';
+import { TransactionModel } from 'src/transactions/models/transaction.model';
 
 @Table({
   tableName: 'categories',
@@ -62,4 +63,7 @@ export class CategoryModel extends Model<CategoryModel> {
 
   @BelongsTo(() => BudgetGroupModel)
   budgetGroup: BudgetGroupModel;
+
+  @HasMany(() => TransactionModel)
+  transactions: TransactionModel[];
 }

@@ -4,6 +4,7 @@ import { NotFoundException, InternalServerErrorException } from '@nestjs/common'
 import { BudgetGroupsService } from './budget-groups.service';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CategoryModel } from 'src/categories/models/category.model';
+import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 import { ulid } from 'ulid';
@@ -13,6 +14,7 @@ describe('BudgetGroupsService', () => {
   let service: BudgetGroupsService;
   let mockBudgetGroupModel: any;
   let mockCategoryModel: any;
+  let mockTransactionModel: any;
   let mockLogger: any;
   let mockSequelize: any;
 
@@ -39,6 +41,11 @@ describe('BudgetGroupsService', () => {
       update: jest.fn(),
     };
 
+    // Mock TransactionModel
+    mockTransactionModel = {
+      findAll: jest.fn(),
+    };
+
     // Mock LoggerService
     mockLogger = {
       error: jest.fn(),
@@ -55,6 +62,10 @@ describe('BudgetGroupsService', () => {
         {
           provide: getModelToken(CategoryModel),
           useValue: mockCategoryModel,
+        },
+        {
+          provide: getModelToken(TransactionModel),
+          useValue: mockTransactionModel,
         },
         {
           provide: LoggerService,

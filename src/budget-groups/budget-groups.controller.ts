@@ -10,6 +10,7 @@ import {
   UseGuards,
   Request,
   Put,
+  Query,
 } from '@nestjs/common';
 import { BudgetGroupsService } from './budget-groups.service';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
@@ -27,6 +28,16 @@ export class BudgetGroupsController {
     const { user } = req;
     createDto.userId = user.id;
     return await this.budgetGroupsService.create(createDto);
+  }
+
+  @Get('overview')
+  async getBudgetOverview(
+    @Request() req,
+    @Query('year') year?: string
+  ) {
+    const { user } = req;
+    const targetYear = year ? parseInt(year, 10) : 2025;
+    return await this.budgetGroupsService.getBudgetOverview(user.id, targetYear);
   }
 
   @Get()
