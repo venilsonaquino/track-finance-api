@@ -107,21 +107,9 @@ export class BudgetGroupsService {
   ): Promise<void> {
     try {
       await this.sequelize.transaction(async (tx) => {
-        // Validate that no assignments are for SALDO group
-        const budgetGroupIds = syncAssignmentsDto.assignments.map(a => a.budgetGroupId).filter(Boolean);
-        if (budgetGroupIds.length > 0) {
-          const saldoGroups = await this.model.findAll({
-            where: {
-              id: budgetGroupIds,
-              title: 'SALDO'
-            },
-            transaction: tx
-          });
+        
 
-          if (saldoGroups.length > 0) {
-            throw new InternalServerErrorException('Cannot assign categories to SALDO budget group');
-          }
-        }
+        //TODO: fazer validação para não permitir atribuir categorias ao grupo SALDO
 
         const categoryIds = syncAssignmentsDto.assignments.map((a) => a.categoryId);
         const categories = await this.categoryModel.findAll(
