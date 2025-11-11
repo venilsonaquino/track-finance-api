@@ -147,12 +147,14 @@ export class BudgetGroupsService {
     } catch (error) {
       this.logger.error('Error syncing category assignments', error);
       if (error instanceof NotFoundException) throw error;
+      if( error instanceof UnprocessableEntityException) throw error;
       throw new InternalServerErrorException('Error syncing category assignments');
     }
   }
 
   async getBudgetOverview(userId: string, year: number = 2025): Promise<BudgetOverviewDto> {
     try {
+
       // Fetch all budget groups with their categories
       const budgetGroups = await this.model.findAll({
         where: {
@@ -224,6 +226,7 @@ export class BudgetGroupsService {
 
     } catch (error) {
       this.logger.error('Error getting budget overview', error);
+      if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException('Error getting budget overview');
     }
   }
