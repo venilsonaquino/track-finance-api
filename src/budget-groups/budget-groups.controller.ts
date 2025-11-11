@@ -11,12 +11,14 @@ import {
   Request,
   Put,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { BudgetGroupsService } from './budget-groups.service';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
 import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
+import { ReorderBudgetGroupsDto } from './dto/reorder-budget-groups.dto';
 
 @UseGuards(AuthGuard)
 @Controller('budget-groups')
@@ -68,6 +70,13 @@ export class BudgetGroupsController {
     const { user } = req;
     updateDto.userId = user.id;
     return await this.budgetGroupsService.update(id, updateDto);
+  }
+
+  
+  @Patch('reorder')
+  async reorderGroups(@Body() reorderDto: ReorderBudgetGroupsDto, @Request() req) {
+    const { user } = req;
+    return await this.budgetGroupsService.reorderGroups(user.id, reorderDto.groups);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

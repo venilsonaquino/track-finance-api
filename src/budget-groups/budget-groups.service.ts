@@ -16,6 +16,7 @@ import {
   createZeroYear 
 } from './dto/budget-overview.dto';
 import { BudgetGroupKind } from './enum/BudgetGroupKind';
+import { BudgetGroupPositionDto } from './dto/reorder-budget-groups.dto';
 
 @Injectable()
 export class BudgetGroupsService {
@@ -229,6 +230,10 @@ export class BudgetGroupsService {
       if( error instanceof UnprocessableEntityException) throw error;
       throw new InternalServerErrorException('Error getting budget overview');
     }
+  }
+
+  async reorderGroups(id: any, groups: BudgetGroupPositionDto[]) {
+    throw new Error('Method not implemented.');
   }
 
   private calculateMonthlyValues(transactions: any[], year: number): MonthlyValues {
