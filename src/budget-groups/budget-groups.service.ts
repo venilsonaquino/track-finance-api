@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, InternalServerErrorException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
@@ -107,9 +107,22 @@ export class BudgetGroupsService {
   ): Promise<void> {
     try {
       await this.sequelize.transaction(async (tx) => {
-        
 
-        //TODO: fazer validação para não permitir atribuir categorias ao grupo SALDO
+        const computedGroup = await this.model.findOne({ 
+          where: { 
+            kind: BudgetGroupKind.COMPUTED, 
+            userId 
+          } 
+        });
+
+        const hasComputedGroupAssignment = computedGroup && 
+          syncAssignmentsDto.assignments.some(assignment => 
+            assignment.budgetGroupId === computedGroup.id
+          );
+
+        if (hasComputedGroupAssignment) {
+          throw new UnprocessableEntityException('Cannot assign categories to computed budget groups (SALDO)');
+        }
 
         const categoryIds = syncAssignmentsDto.assignments.map((a) => a.categoryId);
         const categories = await this.categoryModel.findAll(
