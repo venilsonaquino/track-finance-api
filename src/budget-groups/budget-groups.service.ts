@@ -152,8 +152,10 @@ export class BudgetGroupsService {
     }
   }
 
-  async getBudgetOverview(userId: string, year: number = 2025): Promise<BudgetOverviewDto> {
+  async getBudgetOverview(userId: string, year: number): Promise<BudgetOverviewDto> {
     try {
+
+      if(isNaN(year) || year < 1900 || year > 2100) throw new UnprocessableEntityException('Invalid year parameter');
 
       // Fetch all budget groups with their categories
       const budgetGroups = await this.model.findAll({
@@ -186,11 +188,9 @@ export class BudgetGroupsService {
         ],
       });
 
-      // Separate computed and editable sections
       const computedGroup = budgetGroups.find(group => group.kind === BudgetGroupKind.COMPUTED);
       const editableGroups = budgetGroups.filter(group => group.kind === BudgetGroupKind.EDITABLE);
 
-      // Build sections computed
       const sectionsComputed: BudgetSectionComputed = {
         id: computedGroup?.id,
         title: computedGroup?.title,
@@ -204,7 +204,6 @@ export class BudgetGroupsService {
         }))
       };
 
-      // Build sections editable
       const sectionsEditable: BudgetSectionEditable[] = editableGroups.map(group => ({
         id: group.id,
         title: group.title,
@@ -227,6 +226,7 @@ export class BudgetGroupsService {
     } catch (error) {
       this.logger.error('Error getting budget overview', error);
       if (error instanceof NotFoundException) throw error;
+      if( error instanceof UnprocessableEntityException) throw error;
       throw new InternalServerErrorException('Error getting budget overview');
     }
   }
