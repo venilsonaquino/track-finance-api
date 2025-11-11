@@ -56,6 +56,13 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
   isSystemDefault: boolean;
 
   @Column({
+    type: DataType.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  })
+  position: number;
+
+  @Column({
     field: 'user_id',
     type: 'VARCHAR(26)',
     allowNull: true,

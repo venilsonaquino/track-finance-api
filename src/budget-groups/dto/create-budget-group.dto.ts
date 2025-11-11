@@ -1,4 +1,4 @@
-import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsDefined, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 
 export class CreateBudgetGroupDto {
@@ -18,6 +18,11 @@ export class CreateBudgetGroupDto {
   @IsOptional()
   @IsString()
   footerLabel?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  position?: number;
 
   @IsOptional()
   isSystemDefault?: boolean;
