@@ -225,6 +225,7 @@ export class BudgetGroupsService {
         kind: 'computed',
         color: computedGroup?.color,
         position: computedGroup?.position,
+        isSystemDefault: computedGroup?.isSystemDefault || false,
         footerLabel: computedGroup?.footerLabel || `Total ${computedGroup?.title}`,
         rows: editableGroups.map(group => ({
           id: group.id,
@@ -240,6 +241,7 @@ export class BudgetGroupsService {
         color: group.color,
         position: group.position,
         footerLabel: group.footerLabel || `Total ${group.title}`,
+        isSystemDefault: group.isSystemDefault || false,
         rows: group.categories?.map(category => ({
           id: category.id,
           label: category.name,

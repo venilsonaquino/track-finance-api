@@ -50,6 +50,7 @@ export interface BudgetSectionComputed {
   position: number;
   color: string;
   footerLabel: string;
+  isSystemDefault: boolean;
   rows: BudgetRowComputed[];
 }
 
@@ -60,6 +61,7 @@ export interface BudgetSectionEditable {
   position: number;
   color: string;
   footerLabel: string;
+  isSystemDefault: boolean;
   rows: BudgetRowEditable[];
 }
 
