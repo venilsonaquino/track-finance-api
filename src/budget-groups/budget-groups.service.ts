@@ -262,8 +262,40 @@ export class BudgetGroupsService {
     }
   }
 
-  async reorderGroups(id: any, groups: BudgetGroupPositionDto[]) {
-    throw new Error('Method not implemented.');
+  async reorderGroups(id: string, groups: BudgetGroupPositionDto[]) {
+    try {
+      await this.sequelize.transaction(async (tx) => {
+        
+        const groupIds = groups.map(g => g.id);
+        const existingGroups = await this.model.findAll({
+          where: { id: groupIds, userId: id },
+          transaction: tx
+        });
+
+        if (existingGroups.length !== groups.length) {
+          throw new NotFoundException('Some budget groups not found or do not belong to the user');
+        }
+
+        const positions = groups.map(g => g.position);
+        if (new Set(positions).size !== positions.length) {
+          throw new UnprocessableEntityException('Positions must be unique');
+        }
+
+        await Promise.all(groups.map(groupDto =>
+          this.model.update(
+            { position: groupDto.position },
+            { where: { id: groupDto.id, userId: id }, transaction: tx }
+          )
+        ));
+
+        await this.reorganizeGroupPositions(id, tx);
+      });
+    } catch (error) {
+      this.logger.error('Error reordering budget groups', error);
+      if (error instanceof NotFoundException) throw error;
+      if (error instanceof UnprocessableEntityException) throw error;
+      throw new InternalServerErrorException('Error reordering budget groups');
+    }
   }
 
   private calculateMonthlyValues(transactions: any[], year: number): MonthlyValues {
@@ -285,7 +317,8 @@ export class BudgetGroupsService {
   private async reorganizeGroupPositions(userId: string, tx: Transaction): Promise<void> {
     const groups = await this.model.findAll({
       where: { userId },
-      order: [['position', 'ASC']]
+      order: [['position', 'ASC']],
+      transaction: tx
     });
 
     for (let i = 0; i < groups.length; i++) {

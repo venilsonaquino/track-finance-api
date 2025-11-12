@@ -10,9 +10,13 @@ export class BudgetGroupPositionDto {
   position: number;
 }
 
-export class ReorderBudgetGroupsDto {
+export class ReorderBudgetGroupsRequest {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BudgetGroupPositionDto)
   groups: BudgetGroupPositionDto[];
+}
+
+export class ReorderBudgetGroupsResponse {
+  success: boolean;
 }
