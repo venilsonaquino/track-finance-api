@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException, InternalServerErrorException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
+import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
+import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
 import { Op, Sequelize, Transaction } from 'sequelize';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { CategoryModel } from 'src/categories/models/category.model';
@@ -15,9 +17,6 @@ import {
 } from './dto/budget-overview.dto';
 import { BudgetGroupKind } from './enum/BudgetGroupKind';
 import { BudgetGroupPositionDto } from './dto/reorder-budget-groups.dto';
-import { CreateBudgetGroupRequest } from './dto/create-budget-group.dto';
-import { UpdateBudgetGroupRequest } from './dto/update-budget-group.dto';
-import { BudgetGroupEntity } from './entities/budget-group.entity';
 
 @Injectable()
 export class BudgetGroupsService {
@@ -34,15 +33,13 @@ export class BudgetGroupsService {
   
   private readonly sequelize: Sequelize = this.model.sequelize as Sequelize;
 
-  async create(createDto: CreateBudgetGroupRequest, userId: string) {
+  async create(createDto: CreateBudgetGroupDto) {
     try {
 
-      const entity = new BudgetGroupEntity({ ...createDto, userId });
-      
       const existingGroup = await this.model.findOne({
         where: {
-          userId: userId,
-          title: entity.title,
+          userId: createDto.userId,
+          title: createDto.title,
         },
       });
       if (existingGroup) {
@@ -54,12 +51,12 @@ export class BudgetGroupsService {
       }
 
       const lastGroup = await this.model.findOne({
-        where: { userId },
+        where: { userId: createDto.userId },
         order: [['position', 'DESC']],
       });
-      entity.position = lastGroup ? lastGroup.position + 1 : 1;
+      createDto.position = lastGroup ? lastGroup.position + 1 : 1;
 
-      return await this.model.create(entity);
+      return await this.model.create(createDto);
     } catch (error) {
       this.logger.error('Error creating budget group', error);
       if (error instanceof UnprocessableEntityException) throw error;
@@ -89,12 +86,9 @@ export class BudgetGroupsService {
     return item;
   }
 
-  async update(id: string, updateDto: UpdateBudgetGroupRequest, userId: string) {
-
-    const entity = new BudgetGroupEntity({ ...updateDto, userId, id });
-
-    const [affectedCount, updated] = await this.model.update(entity, {
-      where: { id, userId },
+  async update(id: string, updateDto: UpdateBudgetGroupDto) {
+    const [affectedCount, updated] = await this.model.update(updateDto, {
+      where: { id, userId: updateDto.userId },
       returning: true,
     });
 
@@ -129,7 +123,7 @@ export class BudgetGroupsService {
     }
   }
 
-  async createMany(dtos: CreateBudgetGroupRequest[]) {
+  async createMany(dtos: CreateBudgetGroupDto[]) {
     try {
       var created = await this.model.bulkCreate(dtos as any[]);
       return created;

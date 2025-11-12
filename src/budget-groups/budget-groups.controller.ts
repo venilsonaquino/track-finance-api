@@ -14,8 +14,8 @@ import {
   Patch,
 } from '@nestjs/common';
 import { BudgetGroupsService } from './budget-groups.service';
-import { CreateBudgetGroupResponse, CreateBudgetGroupRequest } from './dto/create-budget-group.dto';
-import { UpdateBudgetGroupResponse, UpdateBudgetGroupRequest } from './dto/update-budget-group.dto';
+import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
+import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { ReorderBudgetGroupsDto } from './dto/reorder-budget-groups.dto';
@@ -26,9 +26,10 @@ export class BudgetGroupsController {
   constructor(private readonly budgetGroupsService: BudgetGroupsService) {}
 
   @Post()
-  async create(@Body() createDto: CreateBudgetGroupRequest, @Request() req): Promise<CreateBudgetGroupResponse> {
+  async create(@Body() createDto: CreateBudgetGroupDto, @Request() req) {
     const { user } = req;
-    return await this.budgetGroupsService.create(createDto, user.id);
+    createDto.userId = user.id;
+    return await this.budgetGroupsService.create(createDto);
   }
 
   @Get('overview')
@@ -63,11 +64,12 @@ export class BudgetGroupsController {
   @Put(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateDto: UpdateBudgetGroupRequest,
+    @Body() updateDto: UpdateBudgetGroupDto,
     @Request() req,
   ) {
     const { user } = req;
-    return await this.budgetGroupsService.update(id, updateDto, user.id);
+    updateDto.userId = user.id;
+    return await this.budgetGroupsService.update(id, updateDto);
   }
 
   

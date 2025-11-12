@@ -1,7 +1,7 @@
 import { IsDefined, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 
-export class CreateBudgetGroupResponse {
+export class CreateBudgetGroupDto {
   @IsDefined()
   @IsString()
   @IsNotEmpty()
@@ -30,15 +30,4 @@ export class CreateBudgetGroupResponse {
   @IsOptional()
   @IsString()
   userId?: string;
-}
-
-export class CreateBudgetGroupRequest {
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @IsOptional()
-  @IsString()
-  color: string;
 }
