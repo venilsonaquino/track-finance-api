@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BudgetGroupsService } from '../budget-groups.service';
-import { CreateBudgetGroupDto } from '../dto/create-budget-group.dto';
+import { CreateBudgetGroupRequest } from '../dto/create-budget-group.dto';
 import { SyncCategoryAssignmentsDto } from '../dto/sync-category-assignments.dto';
 import { BudgetOverviewDto } from '../dto/budget-overview.dto';
 
@@ -8,7 +8,7 @@ import { BudgetOverviewDto } from '../dto/budget-overview.dto';
 export class BudgetGroupFacade {
   constructor(private readonly service: BudgetGroupsService) {}
 
-  async createBudgetGroup(dtos: CreateBudgetGroupDto[]): Promise<void> {
+  async createBudgetGroup(dtos: CreateBudgetGroupRequest[]): Promise<void> {
     await this.service.createMany(dtos);
   }
 

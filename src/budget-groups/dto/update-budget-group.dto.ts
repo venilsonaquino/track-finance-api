@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
-import { CreateBudgetGroupDto } from './create-budget-group.dto';
+import { CreateBudgetGroupRequest, CreateBudgetGroupResponse } from './create-budget-group.dto';
 
-export class UpdateBudgetGroupDto extends PartialType(CreateBudgetGroupDto) {}
+export class UpdateBudgetGroupRequest extends PartialType(CreateBudgetGroupRequest) {}
+export class UpdateBudgetGroupResponse extends PartialType(CreateBudgetGroupResponse) {}

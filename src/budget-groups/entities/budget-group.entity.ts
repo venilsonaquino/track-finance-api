@@ -31,12 +31,12 @@ export class BudgetGroupEntity {
   ) {
     this.id = params.id || ulid();
     this.title = params.title;
-    this.kind = params.kind;
-    this.color = params.color;
-    this.footerLabel = params.footerLabel;
+    this.kind = BudgetGroupKind.EDITABLE;
+    this.color = params.color || '#470661ff';
+    this.footerLabel = `Total ${params.title}`;
     this.position = params.position;
     this.userId = params.userId;
-    this.isSystemDefault = params.isSystemDefault;
+    this.isSystemDefault = false;
   }
 
   private get normalizedTitle() {
