@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
 import { UpdateBudgetGroupDto } from './dto/update-budget-group.dto';
-import { Op, Sequelize } from 'sequelize';
+import { Op, Sequelize, Transaction } from 'sequelize';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
@@ -35,9 +35,32 @@ export class BudgetGroupsService {
 
   async create(createDto: CreateBudgetGroupDto) {
     try {
+
+      const existingGroup = await this.model.findOne({
+        where: {
+          userId: createDto.userId,
+          title: createDto.title,
+        },
+      });
+      if (existingGroup) {
+        throw new UnprocessableEntityException('Already exists a budget group with this name.');
+      }
+
+      if (existingGroup && existingGroup.isSystemDefault) {
+        throw new UnprocessableEntityException('Already exists a system default budget group with this name.');
+      }
+
+      const lastGroup = await this.model.findOne({
+        where: { userId: createDto.userId },
+        order: [['position', 'DESC']],
+      });
+      createDto.position = lastGroup ? lastGroup.position + 1 : 1;
+
       return await this.model.create(createDto);
     } catch (error) {
-      throw Error(error);
+      this.logger.error('Error creating budget group', error);
+      if (error instanceof UnprocessableEntityException) throw error;
+      throw new InternalServerErrorException('Error creating budget group');
     }
   }
 
@@ -77,15 +100,27 @@ export class BudgetGroupsService {
   }
 
   async remove(id: string, userId: string) {
-    const group = await this.findOne(id, userId);
-    if (group.isSystemDefault) {
-      throw new InternalServerErrorException('Cannot delete system budget groups');
+    try{
+      await this.sequelize.transaction(async (tx) => {
+        const group = await this.findOne(id, userId);
+        if (group.isSystemDefault) {
+          throw new UnprocessableEntityException('Cannot delete system budget groups');
+        }
+        const deletedCount = await this.model.destroy({ where: { id, userId }, transaction: tx });
+        if (deletedCount === 0) {
+          throw new NotFoundException(`Budget group with id ${id} not found`);
+        }
+
+        await this.reorganizeGroupPositions(userId, tx);
+        
+        return;
+      })
+    }catch(error){
+      this.logger.error('Error deleting budget group', error);
+      if (error instanceof NotFoundException) throw error;
+      if (error instanceof UnprocessableEntityException) throw error;
+      throw new InternalServerErrorException('Error deleting budget group');
     }
-    const deletedCount = await this.model.destroy({ where: { id, userId } });
-    if (deletedCount === 0) {
-      throw new NotFoundException(`Budget group with id ${id} not found`);
-    }
-    return;
   }
 
   async createMany(dtos: CreateBudgetGroupDto[]) {
@@ -245,5 +280,19 @@ export class BudgetGroupsService {
     });
 
     return monthlyValues;
+  }
+
+  private async reorganizeGroupPositions(userId: string, tx: Transaction): Promise<void> {
+    const groups = await this.model.findAll({
+      where: { userId },
+      order: [['position', 'ASC']]
+    });
+
+    for (let i = 0; i < groups.length; i++) {
+      if (groups[i].position !== i + 1) {
+        groups[i].position = i + 1;
+        await groups[i].save({ transaction: tx });
+      }
+    }
   }
 }
