@@ -48,12 +48,8 @@ export class BudgetGroupsService {
       },
       include: [{ model: this.categoryModel, as: 'categories' }],
       order: [
-        ['isSystemDefault', 'DESC'], // System defaults first
-        [this.sequelize.literal(`CASE 
-          WHEN title = 'SALDO' THEN 1 
-          WHEN title = 'RECEITAS' THEN 2 
-          ELSE 3 
-        END`), 'ASC'], // SALDO first, then RECEITAS, then others
+        ['isSystemDefault', 'DESC'],
+        ['position', 'ASC'],
         ['created_at', 'DESC']
       ],
     });
@@ -180,11 +176,7 @@ export class BudgetGroupsService {
         }],
         order: [
           ['isSystemDefault', 'DESC'],
-          [this.sequelize.literal(`CASE 
-            WHEN title = 'SALDO' THEN 1 
-            WHEN title = 'RECEITAS' THEN 2 
-            ELSE 3 
-          END`), 'ASC'],
+          ['position', 'ASC'],
           ['created_at', 'DESC']
         ],
       });
@@ -197,6 +189,7 @@ export class BudgetGroupsService {
         title: computedGroup?.title,
         kind: 'computed',
         color: computedGroup?.color,
+        position: computedGroup?.position,
         footerLabel: computedGroup?.footerLabel || `Total ${computedGroup?.title}`,
         rows: editableGroups.map(group => ({
           id: group.id,
@@ -210,10 +203,12 @@ export class BudgetGroupsService {
         title: group.title,
         kind: 'editable',
         color: group.color,
+        position: group.position,
         footerLabel: group.footerLabel || `Total ${group.title}`,
         rows: group.categories?.map(category => ({
           id: category.id,
           label: category.name,
+          position: group.position,
           values: this.calculateMonthlyValues(category.transactions || [], year)
         })) || []
       }));

@@ -40,12 +40,14 @@ export interface BudgetRowEditable {
   id: string;
   label: string;
   values: MonthlyValues;
+  position: number;
 }
 
 export interface BudgetSectionComputed {
   id: string;
   title: string;
   kind: 'computed';
+  position: number;
   color: string;
   footerLabel: string;
   rows: BudgetRowComputed[];
@@ -55,6 +57,7 @@ export interface BudgetSectionEditable {
   id: string;
   title: string;
   kind: 'editable';
+  position: number;
   color: string;
   footerLabel: string;
   rows: BudgetRowEditable[];
