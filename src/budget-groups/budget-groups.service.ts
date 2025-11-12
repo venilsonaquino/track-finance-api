@@ -300,6 +300,26 @@ export class BudgetGroupsService {
     }
   }
 
+
+  async updateGroupName(id: string, userId: string, title: string) {
+    try {
+      const group = await this.model.findOne({ where: { id, userId } });
+      if (!group) {
+        throw new NotFoundException(`Budget group with id ${id} not found`);
+      }
+
+      group.title = title;
+      group.title.toUpperCase();
+      await group.save();
+
+      return group;
+    } catch (error) {
+      this.logger.error('Error updating budget group name', error);
+      if (error instanceof NotFoundException) throw error;
+      throw new InternalServerErrorException('Error updating budget group name');
+    }
+  }
+
   private calculateMonthlyValues(transactions: any[], year: number): MonthlyValues {
     const monthlyValues = createZeroYear();
     const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];

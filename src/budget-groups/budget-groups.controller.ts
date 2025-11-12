@@ -85,4 +85,14 @@ export class BudgetGroupsController {
     const { user } = req;
     return await this.budgetGroupsService.remove(id, user.id);
   }
+
+  @Patch(':id/rename')
+  async updateGroupName(
+    @Param('id') id: string,
+    @Body('title') title: string,
+    @Request() req,
+  ) {
+    const { user } = req;
+    return await this.budgetGroupsService.updateGroupName(id, user.id, title);
+  }
 }
