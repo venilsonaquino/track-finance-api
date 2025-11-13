@@ -1,0 +1,13 @@
+@token=your_actual_token_here
+
+### Budget Overview
+GET http://localhost:3000/budget-groups/overview
+Authorization: Bearer {{token}}
+
+### Budget Overview for specific year
+GET http://localhost:3000/budget-groups/overview?year=2024
+Authorization: Bearer {{token}}
+
+### Get all budget groups (for comparison)
+GET http://localhost:3000/budget-groups
+Authorization: Bearer {{token}}

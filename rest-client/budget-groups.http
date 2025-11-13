@@ -1,0 +1,30 @@
+### Get all budget groups
+GET http://localhost:3000/budget-groups
+Accept: application/json
+
+### Get budget group by ID
+GET http://localhost:3000/budget-groups/1
+Accept: application/json
+
+### Create new budget group
+POST http://localhost:3000/budget-groups
+Content-Type: application/json
+
+{
+  "name": "Monthly Expenses",
+  "description": "Group for monthly recurring expenses",
+  "color": "#FF5733"
+}
+
+### Update budget group
+PUT http://localhost:3000/budget-groups/1
+Content-Type: application/json
+
+{
+  "name": "Updated Monthly Expenses",
+  "description": "Updated description",
+  "color": "#33FF57"
+}
+
+### Delete budget group
+DELETE http://localhost:3000/budget-groups/1

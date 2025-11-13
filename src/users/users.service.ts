@@ -27,7 +27,7 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto) {
     this.logger.log(
-      `Tentativa de criação de usuário com email: ${createUserDto.email}`,
+      `Creating a user with email: ${createUserDto.email}`,
       'UsersService',
     );
 
@@ -36,7 +36,7 @@ export class UsersService {
     const existingUser = await this.userModel.findOne({ where: { email } });
     if (existingUser) {
       this.logger.warn(
-        `Tentativa de criar usuário com email já existente: ${email}`,
+        `Attempt to create user with existing email: ${email}`,
         'UsersService',
       );
       throw new ConflictException('E-mail is already in use.');
@@ -54,7 +54,7 @@ export class UsersService {
 
     const newUser = await this.userModel.create(user);
     this.logger.log(
-      `Usuário criado com sucesso. ID: ${newUser.id}`,
+      `User created successfully. ID: ${newUser.id}`,
       'UsersService',
     );
 
@@ -67,16 +67,16 @@ export class UsersService {
   }
 
   async findAll() {
-    this.logger.log('Buscando todos os usuários', 'UsersService');
+    this.logger.log('Fetching all users', 'UsersService');
     return await this.userModel.findAll();
   }
 
   async findOne(id: string) {
-    this.logger.log(`Buscando usuário com ID: ${id}`, 'UsersService');
+    this.logger.log(`Fetching user with ID: ${id}`, 'UsersService');
     const user = await this.userModel.findOne({ where: { id } });
 
     if (!user) {
-      this.logger.warn(`Usuário não encontrado. ID: ${id}`, 'UsersService');
+      this.logger.warn(`User not found. ID: ${id}`, 'UsersService');
       throw new NotFoundException();
     }
 
@@ -84,12 +84,12 @@ export class UsersService {
   }
 
   async findEmail(email: string) {
-    this.logger.log(`Buscando usuário por email: ${email}`, 'UsersService');
+    this.logger.log(`Fetching user by email: ${email}`, 'UsersService');
     return await this.userModel.findOne({ where: { email } });
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    this.logger.log(`Atualizando usuário com ID: ${id}`, 'UsersService');
+    this.logger.log(`Updating user with ID: ${id}`, 'UsersService');
 
     const { password } = updateUserDto;
 
@@ -106,44 +106,41 @@ export class UsersService {
 
     if (affectedCount == 0 && updated.length == 0) {
       this.logger.warn(
-        `Tentativa de atualizar usuário não encontrado. ID: ${id}`,
+        `Attempt to update non-existing user. ID: ${id}`,
         'UsersService',
       );
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    this.logger.log(
-      `Usuário atualizado com sucesso. ID: ${id}`,
-      'UsersService',
-    );
+    this.logger.log(`User updated successfully. ID: ${id}`, 'UsersService');
     return updated[0];
   }
 
   async remove(id: string): Promise<void> {
-    this.logger.log(`Removendo usuário com ID: ${id}`, 'UsersService');
+    this.logger.log(`Removing user with ID: ${id}`, 'UsersService');
     const deletedCount = await this.userModel.destroy({ where: { id } });
 
     if (deletedCount === 0) {
       this.logger.warn(
-        `Tentativa de remover usuário não encontrado. ID: ${id}`,
+        `Attempt to remove non-existing user. ID: ${id}`,
         'UsersService',
       );
       throw new NotFoundException(`User with id ${id} not found`);
     }
-    this.logger.log(`Usuário removido com sucesso. ID: ${id}`, 'UsersService');
+    this.logger.log(`User removed successfully. ID: ${id}`, 'UsersService');
     return;
   }
 
   async updateRefreshToken(id: string, refreshToken: string) {
     this.logger.log(
-      `Atualizando refresh token para usuário ID: ${id}`,
+      `Updating refresh token for user ID: ${id}`,
       'UsersService',
     );
     await this.userModel.update({ refreshToken }, { where: { id } });
   }
 
   async findByRefreshToken(refreshToken: string): Promise<UserEntity | null> {
-    this.logger.log('Buscando usuário por refresh token', 'UsersService');
+    this.logger.log('Fetching user by refresh token', 'UsersService');
     const user = await this.userModel.findOne({ where: { refreshToken } });
     return user;
   }
