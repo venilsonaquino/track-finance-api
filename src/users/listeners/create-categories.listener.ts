@@ -3,10 +3,17 @@ import { Injectable } from '@nestjs/common';
 import { UserCreatedEvent } from '../events/user-created.event';
 import { CategoryFacade } from 'src/categories/facades/category.facade';
 import { CreateCategoryDto } from 'src/categories/dto/create-category.dto';
+import { BudgetGroupFacade } from 'src/budget-groups/facades/budget-group.facade';
+import { SyncCategoryAssignmentsDto } from 'src/budget-groups/dto/sync-category-assignments.dto';
+import { LoggerService } from 'src/config/logging/logger.service';
 
 @Injectable()
 export class CreateCategoriesListener {
-  constructor(private readonly categoryFacade: CategoryFacade) {}
+  constructor(
+    private readonly categoryFacade: CategoryFacade, 
+    private readonly budgetGroupFacade: BudgetGroupFacade, 
+    private readonly logger: LoggerService
+  ) {}
 
   @OnEvent('user.created')
   async handleUserCreatedEvent(event: UserCreatedEvent) {
@@ -158,10 +165,30 @@ export class CreateCategoriesListener {
         color: '#3498DB',
         userId: event.userId,
       },
+      {
+       name: 'Salário',
+       description: 'Recebimento de salário',
+       icon: 'wallet',
+       color: '#27AE60',
+       userId: event.userId, 
+      }
     ];
 
     for (const category of defaultCategories) {
       await this.categoryFacade.createCategory(category);
     }
+
+    const receitaGroup = await this.budgetGroupFacade.findAllByUser(event.userId).then(groups => groups.find(g => g.title === 'RECEITAS'));
+    if (receitaGroup) {
+      const salarioCategory = await this.categoryFacade.findAllByUser(event.userId).then(categories => categories.find(c => c.name === 'Salário'));
+      if (salarioCategory) {
+        const syncDto: SyncCategoryAssignmentsDto = {
+          assignments: [{ categoryId: salarioCategory.id, budgetGroupId: receitaGroup.id }]
+        };
+        await this.budgetGroupFacade.syncCategoryAssignments(syncDto, event.userId);
+      }
+    }
+
+    this.logger.log(`Default budget categories created for user ${event.userId}`, 'CreateCategoriesListener');
   }
 }

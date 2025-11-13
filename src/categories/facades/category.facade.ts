@@ -9,4 +9,8 @@ export class CategoryFacade {
   async createCategory(category: CreateCategoryDto): Promise<void> {
     await this.categoriesService.create(category);
   }
+
+  async findAllByUser(userId: string) {
+    return this.categoriesService.findAllByUser(userId);
+  }
 }

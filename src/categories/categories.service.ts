@@ -5,6 +5,10 @@ import { CategoryModel } from './models/category.model';
 import { InjectModel } from '@nestjs/sequelize';
 import { CategoryEntity } from './entities/category.entity';
 import { Op } from 'sequelize';
+import {
+  CategoryOrderDirection,
+  CategorySortableField,
+} from './dto/find-categories-query.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -29,14 +33,25 @@ export class CategoriesService {
     }
   }
 
-  async findAllByUser(userId: string) {
+
+  async findAllByUser(
+    userId: string,
+    orderBy?: CategorySortableField,
+    direction?: CategoryOrderDirection,
+  ) {
+    const orderField =
+      orderBy === CategorySortableField.NOME ? 'name' : orderBy;
+    const order: [string, string][] = orderField
+      ? [[orderField, direction ?? CategoryOrderDirection.ASC]]
+      : [['created_at', 'DESC']];
     return await this.categoryModel.findAll({
       where: {
         [Op.or]: [{ userId }, { userId: null }],
       },
-      order: [['created_at', 'DESC']],
+      order,
     });
   }
+
 
   async findOne(id: string, userId: string) {
     const category = await this.categoryModel.findOne({

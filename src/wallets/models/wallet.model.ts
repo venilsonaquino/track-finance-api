@@ -21,7 +21,7 @@ export class WalletModel extends Model<WalletModel> {
   @PrimaryKey
   @Column({
     type: 'VARCHAR(26)',
-    defaultValue: ulid(),
+    defaultValue: ulid,
   })
   id: string;
 

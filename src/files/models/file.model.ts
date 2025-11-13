@@ -19,7 +19,7 @@ export class FileModel extends Model<FileModel> {
   @Column({
     type: DataType.STRING(26),
     unique: true,
-    defaultValue: ulid(),
+    defaultValue: ulid,
   })
   id: string;
 

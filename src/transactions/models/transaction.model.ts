@@ -22,7 +22,7 @@ export class TransactionModel extends Model<TransactionModel> {
   @PrimaryKey
   @Column({
     type: DataType.STRING(26),
-    defaultValue: ulid(),
+    defaultValue: ulid,
   })
   id: string;
 
