@@ -14,15 +14,20 @@ import { BudgetGroupsModule } from 'src/budget-groups/budget-groups.module';
 
 @Module({
   imports: [
-  SequelizeModule.forFeature([UserModel]),
-  LoggerModule,
-  CategoriesModule,
-  WalletsModule,
-  MailModule,
-  BudgetGroupsModule,
+    SequelizeModule.forFeature([UserModel]),
+    LoggerModule,
+    CategoriesModule,
+    WalletsModule,
+    MailModule,
+    BudgetGroupsModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, CreateCategoriesListener, CreateWalletListener, CreateBudgetGroupsListener],
+  providers: [
+    UsersService,
+    CreateCategoriesListener,
+    CreateWalletListener,
+    CreateBudgetGroupsListener,
+  ],
   exports: [UsersService],
 })
 export class UsersModule {}

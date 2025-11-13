@@ -1,4 +1,12 @@
-import { IsDefined, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDefined,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 
 export class CreateBudgetGroupDto {

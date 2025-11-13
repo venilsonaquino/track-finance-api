@@ -112,10 +112,7 @@ export class UsersService {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    this.logger.log(
-      `User updated successfully. ID: ${id}`,
-      'UsersService',
-    );
+    this.logger.log(`User updated successfully. ID: ${id}`, 'UsersService');
     return updated[0];
   }
 

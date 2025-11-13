@@ -33,7 +33,6 @@ export class CategoriesService {
     }
   }
 
-
   async findAllByUser(
     userId: string,
     orderBy?: CategorySortableField,
@@ -51,7 +50,6 @@ export class CategoriesService {
       order,
     });
   }
-
 
   async findOne(id: string, userId: string) {
     const category = await this.categoryModel.findOne({

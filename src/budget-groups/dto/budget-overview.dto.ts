@@ -83,9 +83,21 @@ export class BudgetOverviewDto {
     this.year = data.year;
     this.locale = 'pt-BR';
     this.currency = 'BRL';
-    this.months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    this.months = [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
     this.sectionsComputed = data.sectionsComputed;
     this.sectionsEditable = data.sectionsEditable;
   }
 }
-
