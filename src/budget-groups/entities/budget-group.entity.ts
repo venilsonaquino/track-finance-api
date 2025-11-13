@@ -57,33 +57,48 @@ export class BudgetGroupEntity {
 
   assertCanReceiveCategoryAssignments() {
     if (this.kind === BudgetGroupKind.COMPUTED) {
-      throw new BudgetGroupDomainException('Cannot assign categories to computed budget groups (SALDO)');
+      throw new BudgetGroupDomainException(
+        'Cannot assign categories to computed budget groups (SALDO)',
+      );
     }
   }
 
   assertCanBeDeleted() {
     if (this.isSystemGroup) {
-      throw new BudgetGroupDomainException('Cannot delete system budget groups');
+      throw new BudgetGroupDomainException(
+        'Cannot delete system budget groups',
+      );
     }
   }
 
   assertCanChangePosition(targetPosition: number) {
     if (this.isSaldo && targetPosition !== BudgetGroupEntity.SALDO_POSITION) {
-      throw new BudgetGroupDomainException('SALDO deve sempre estar na posição 1 e não pode ser reordenado');
+      throw new BudgetGroupDomainException(
+        'SALDO deve sempre estar na posição 1 e não pode ser reordenado',
+      );
     }
 
-    if (this.isReceitas && targetPosition !== BudgetGroupEntity.RECEITAS_POSITION) {
-      throw new BudgetGroupDomainException('RECEITAS deve sempre estar na posição 2 e não pode ser reordenado');
+    if (
+      this.isReceitas &&
+      targetPosition !== BudgetGroupEntity.RECEITAS_POSITION
+    ) {
+      throw new BudgetGroupDomainException(
+        'RECEITAS deve sempre estar na posição 2 e não pode ser reordenado',
+      );
     }
   }
 
   static assertPositionIsAvailable(targetPosition: number) {
     if (targetPosition === BudgetGroupEntity.SALDO_POSITION) {
-      throw new BudgetGroupDomainException('Posição 1 é reservada para o grupo SALDO');
+      throw new BudgetGroupDomainException(
+        'Posição 1 é reservada para o grupo SALDO',
+      );
     }
 
     if (targetPosition === BudgetGroupEntity.RECEITAS_POSITION) {
-      throw new BudgetGroupDomainException('Posição 2 é reservada para o grupo RECEITAS');
+      throw new BudgetGroupDomainException(
+        'Posição 2 é reservada para o grupo RECEITAS',
+      );
     }
   }
 
@@ -93,7 +108,10 @@ export class BudgetGroupEntity {
       return this.position;
     }
 
-    if (this.isReceitas && this.position !== BudgetGroupEntity.RECEITAS_POSITION) {
+    if (
+      this.isReceitas &&
+      this.position !== BudgetGroupEntity.RECEITAS_POSITION
+    ) {
       this.position = BudgetGroupEntity.RECEITAS_POSITION;
       return this.position;
     }

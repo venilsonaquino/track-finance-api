@@ -9,7 +9,14 @@ import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { BudgetGroupFacade } from './facades/budget-group.facade';
 
 @Module({
-  imports: [SequelizeModule.forFeature([BudgetGroupModel, CategoryModel, TransactionModel]), LoggerModule],
+  imports: [
+    SequelizeModule.forFeature([
+      BudgetGroupModel,
+      CategoryModel,
+      TransactionModel,
+    ]),
+    LoggerModule,
+  ],
   controllers: [BudgetGroupsController],
   providers: [BudgetGroupsService, BudgetGroupFacade],
   exports: [BudgetGroupFacade],

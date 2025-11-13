@@ -48,7 +48,7 @@ import { LoggerModule } from './config/logging/logger.module';
     UsersModule,
     TransactionsModule,
     CategoriesModule,
-  BudgetGroupsModule,
+    BudgetGroupsModule,
     FilesModule,
     WalletsModule,
   ],

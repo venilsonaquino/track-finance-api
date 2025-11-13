@@ -33,13 +33,13 @@ export class BudgetGroupsController {
   }
 
   @Get('overview')
-  async getBudgetOverview(
-    @Request() req,
-    @Query('year') year?: string
-  ) {
+  async getBudgetOverview(@Request() req, @Query('year') year?: string) {
     const { user } = req;
     const targetYear = year ? parseInt(year, 10) : 2025;
-    return await this.budgetGroupsService.getBudgetOverview(user.id, targetYear);
+    return await this.budgetGroupsService.getBudgetOverview(
+      user.id,
+      targetYear,
+    );
   }
 
   @Get()
@@ -55,7 +55,10 @@ export class BudgetGroupsController {
   }
 
   @Put('category-assignments')
-  async syncCategoryAssignments(@Body() body: SyncCategoryAssignmentsDto, @Request() req) {
+  async syncCategoryAssignments(
+    @Body() body: SyncCategoryAssignmentsDto,
+    @Request() req,
+  ) {
     const { user } = req;
     await this.budgetGroupsService.syncCategoryAssignments(body, user.id);
     return { success: true };
@@ -72,11 +75,16 @@ export class BudgetGroupsController {
     return await this.budgetGroupsService.update(id, updateDto);
   }
 
-  
   @Patch('reorder')
-  async reorderGroups(@Body() reorderDto: ReorderBudgetGroupsRequest, @Request() req) {
+  async reorderGroups(
+    @Body() reorderDto: ReorderBudgetGroupsRequest,
+    @Request() req,
+  ) {
     const { user } = req;
-    return await this.budgetGroupsService.reorderGroups(user.id, reorderDto.groups);
+    return await this.budgetGroupsService.reorderGroups(
+      user.id,
+      reorderDto.groups,
+    );
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -16,9 +16,7 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
-import {
-  FindCategoriesQueryDto,
-} from './dto/find-categories-query.dto';
+import { FindCategoriesQueryDto } from './dto/find-categories-query.dto';
 
 @UseGuards(AuthGuard)
 @Controller('categories')
@@ -33,10 +31,7 @@ export class CategoriesController {
   }
 
   @Get()
-  async findAll(
-    @Request() req,
-    @Query() query: FindCategoriesQueryDto,
-  ) {
+  async findAll(@Request() req, @Query() query: FindCategoriesQueryDto) {
     const { user } = req;
     return await this.categoriesService.findAllByUser(
       user.id,

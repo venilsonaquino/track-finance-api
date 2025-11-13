@@ -1,4 +1,4 @@
-    export enum BudgetGroupKind {
-    EDITABLE = 'editable',
-    COMPUTED = 'computed'
-  }
+export enum BudgetGroupKind {
+  EDITABLE = 'editable',
+  COMPUTED = 'computed',
+}

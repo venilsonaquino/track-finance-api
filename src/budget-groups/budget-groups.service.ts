@@ -1,4 +1,10 @@
-import { Inject, Injectable, NotFoundException, InternalServerErrorException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { BudgetGroupModel } from './models/budget-group.model';
 import { CreateBudgetGroupDto } from './dto/create-budget-group.dto';
@@ -8,12 +14,12 @@ import { LoggerService } from 'src/config/logging/logger.service';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { SyncCategoryAssignmentsDto } from './dto/sync-category-assignments.dto';
 import { TransactionModel } from 'src/transactions/models/transaction.model';
-import { 
-  BudgetOverviewDto, 
-  BudgetSectionComputed, 
-  BudgetSectionEditable, 
-  MonthlyValues, 
-  createZeroYear 
+import {
+  BudgetOverviewDto,
+  BudgetSectionComputed,
+  BudgetSectionEditable,
+  MonthlyValues,
+  createZeroYear,
 } from './dto/budget-overview.dto';
 import { BudgetGroupKind } from './enum/BudgetGroupKind';
 import { BudgetGroupPositionDto } from './dto/reorder-budget-groups.dto';
@@ -30,12 +36,11 @@ export class BudgetGroupsService {
     @Inject(LoggerService)
     private readonly logger: LoggerService,
   ) {}
-  
+
   private readonly sequelize: Sequelize = this.model.sequelize as Sequelize;
 
   async create(createDto: CreateBudgetGroupDto) {
     try {
-
       const existingGroup = await this.model.findOne({
         where: {
           userId: createDto.userId,
@@ -43,11 +48,15 @@ export class BudgetGroupsService {
         },
       });
       if (existingGroup) {
-        throw new UnprocessableEntityException('Already exists a budget group with this name.');
+        throw new UnprocessableEntityException(
+          'Already exists a budget group with this name.',
+        );
       }
 
       if (existingGroup && existingGroup.isSystemDefault) {
-        throw new UnprocessableEntityException('Already exists a system default budget group with this name.');
+        throw new UnprocessableEntityException(
+          'Already exists a system default budget group with this name.',
+        );
       }
 
       const lastGroup = await this.model.findOne({
@@ -73,7 +82,7 @@ export class BudgetGroupsService {
       order: [
         ['isSystemDefault', 'DESC'],
         ['position', 'ASC'],
-        ['created_at', 'DESC']
+        ['created_at', 'DESC'],
       ],
     });
   }
@@ -100,22 +109,27 @@ export class BudgetGroupsService {
   }
 
   async remove(id: string, userId: string) {
-    try{
+    try {
       await this.sequelize.transaction(async (tx) => {
         const group = await this.findOne(id, userId);
         if (group.isSystemDefault) {
-          throw new UnprocessableEntityException('Cannot delete system budget groups');
+          throw new UnprocessableEntityException(
+            'Cannot delete system budget groups',
+          );
         }
-        const deletedCount = await this.model.destroy({ where: { id, userId }, transaction: tx });
+        const deletedCount = await this.model.destroy({
+          where: { id, userId },
+          transaction: tx,
+        });
         if (deletedCount === 0) {
           throw new NotFoundException(`Budget group with id ${id} not found`);
         }
 
         await this.reorganizeGroupPositions(userId, tx);
-        
+
         return;
-      })
-    }catch(error){
+      });
+    } catch (error) {
       this.logger.error('Error deleting budget group', error);
       if (error instanceof NotFoundException) throw error;
       if (error instanceof UnprocessableEntityException) throw error;
@@ -125,7 +139,7 @@ export class BudgetGroupsService {
 
   async createMany(dtos: CreateBudgetGroupDto[]) {
     try {
-      var created = await this.model.bulkCreate(dtos as any[]);
+      const created = await this.model.bulkCreate(dtos as any[]);
       return created;
     } catch (error) {
       this.logger.error('Error creating budget groups', error);
@@ -139,85 +153,104 @@ export class BudgetGroupsService {
   ): Promise<void> {
     try {
       await this.sequelize.transaction(async (tx) => {
-
-        const computedGroup = await this.model.findOne({ 
-          where: { 
-            kind: BudgetGroupKind.COMPUTED, 
-            userId 
-          } 
+        const computedGroup = await this.model.findOne({
+          where: {
+            kind: BudgetGroupKind.COMPUTED,
+            userId,
+          },
         });
 
-        const hasComputedGroupAssignment = computedGroup && 
-          syncAssignmentsDto.assignments.some(assignment => 
-            assignment.budgetGroupId === computedGroup.id
+        const hasComputedGroupAssignment =
+          computedGroup &&
+          syncAssignmentsDto.assignments.some(
+            (assignment) => assignment.budgetGroupId === computedGroup.id,
           );
 
         if (hasComputedGroupAssignment) {
-          throw new UnprocessableEntityException('Cannot assign categories to computed budget groups (SALDO)');
+          throw new UnprocessableEntityException(
+            'Cannot assign categories to computed budget groups (SALDO)',
+          );
         }
 
-        const categoryIds = syncAssignmentsDto.assignments.map((a) => a.categoryId);
-        const categories = await this.categoryModel.findAll(
-          { where: { 
-              id: categoryIds, 
-              [Op.or]: [{ userId }, { userId: null }] 
-            }, 
-            transaction: tx 
-          });
+        const categoryIds = syncAssignmentsDto.assignments.map(
+          (a) => a.categoryId,
+        );
+        const categories = await this.categoryModel.findAll({
+          where: {
+            id: categoryIds,
+            [Op.or]: [{ userId }, { userId: null }],
+          },
+          transaction: tx,
+        });
 
-          syncAssignmentsDto.assignments.forEach(assignment => {
-              categories.forEach(category => {
-                  if (category.id === assignment.categoryId) {
-                      category.budgetGroupId = assignment.budgetGroupId;
-                  }
-              });
+        syncAssignmentsDto.assignments.forEach((assignment) => {
+          categories.forEach((category) => {
+            if (category.id === assignment.categoryId) {
+              category.budgetGroupId = assignment.budgetGroupId;
+            }
           });
+        });
 
-          var updated = await Promise.all(categories.map(category => category.save({ transaction: tx })));
-          return updated;
+        const updated = await Promise.all(
+          categories.map((category) => category.save({ transaction: tx })),
+        );
+        return updated;
       });
     } catch (error) {
       this.logger.error('Error syncing category assignments', error);
       if (error instanceof NotFoundException) throw error;
-      if( error instanceof UnprocessableEntityException) throw error;
-      throw new InternalServerErrorException('Error syncing category assignments');
+      if (error instanceof UnprocessableEntityException) throw error;
+      throw new InternalServerErrorException(
+        'Error syncing category assignments',
+      );
     }
   }
 
-  async getBudgetOverview(userId: string, year: number): Promise<BudgetOverviewDto> {
+  async getBudgetOverview(
+    userId: string,
+    year: number,
+  ): Promise<BudgetOverviewDto> {
     try {
-
-      if(isNaN(year) || year < 1900 || year > 2100) throw new UnprocessableEntityException('Invalid year parameter');
+      if (isNaN(year) || year < 1900 || year > 2100)
+        throw new UnprocessableEntityException('Invalid year parameter');
 
       // Fetch all budget groups with their categories
       const budgetGroups = await this.model.findAll({
         where: {
           [Op.or]: [{ userId }],
         },
-        include: [{ 
-          model: this.categoryModel, 
-          as: 'categories',
-          include: [{
-            model: this.transactionModel,
-            as: 'transactions',
-            where: {
-              userId,
-              depositedDate: {
-                [Op.between]: [`${year}-01-01`, `${year}-12-31`]
-              }
-            },
-            required: false
-          }]
-        }],
+        include: [
+          {
+            model: this.categoryModel,
+            as: 'categories',
+            include: [
+              {
+                model: this.transactionModel,
+                as: 'transactions',
+                where: {
+                  userId,
+                  depositedDate: {
+                    [Op.between]: [`${year}-01-01`, `${year}-12-31`],
+                  },
+                },
+                required: false,
+              },
+            ],
+          },
+        ],
         order: [
           ['isSystemDefault', 'DESC'],
           ['position', 'ASC'],
-          ['created_at', 'DESC']
+          ['created_at', 'DESC'],
         ],
       });
 
-      const computedGroup = budgetGroups.find(group => group.kind === BudgetGroupKind.COMPUTED);
-      const editableGroups = budgetGroups.filter(group => group.kind === BudgetGroupKind.EDITABLE);
+      const computedGroup = budgetGroups.find(
+        (group) => group.kind === BudgetGroupKind.COMPUTED,
+      );
+      const editableGroups = budgetGroups.filter(
+        (group) => group.kind === BudgetGroupKind.EDITABLE,
+      );
 
       const sectionsComputed: BudgetSectionComputed = {
         id: computedGroup?.id,
@@ -226,40 +259,46 @@ export class BudgetGroupsService {
         color: computedGroup?.color,
         position: computedGroup?.position,
         isSystemDefault: computedGroup?.isSystemDefault || false,
-        footerLabel: computedGroup?.footerLabel || `Total ${computedGroup?.title}`,
-        rows: editableGroups.map(group => ({
+        footerLabel:
+          computedGroup?.footerLabel || `Total ${computedGroup?.title}`,
+        rows: editableGroups.map((group) => ({
           id: group.id,
           label: group.title,
-          refSectionTitle: group.title
-        }))
+          refSectionTitle: group.title,
+        })),
       };
 
-      const sectionsEditable: BudgetSectionEditable[] = editableGroups.map(group => ({
-        id: group.id,
-        title: group.title,
-        kind: 'editable',
-        color: group.color,
-        position: group.position,
-        footerLabel: group.footerLabel || `Total ${group.title}`,
-        isSystemDefault: group.isSystemDefault || false,
-        rows: group.categories?.map(category => ({
-          id: category.id,
-          label: category.name,
+      const sectionsEditable: BudgetSectionEditable[] = editableGroups.map(
+        (group) => ({
+          id: group.id,
+          title: group.title,
+          kind: 'editable',
+          color: group.color,
           position: group.position,
-          values: this.calculateMonthlyValues(category.transactions || [], year)
-        })) || []
-      }));
+          footerLabel: group.footerLabel || `Total ${group.title}`,
+          isSystemDefault: group.isSystemDefault || false,
+          rows:
+            group.categories?.map((category) => ({
+              id: category.id,
+              label: category.name,
+              position: group.position,
+              values: this.calculateMonthlyValues(
+                category.transactions || [],
+                year,
+              ),
+            })) || [],
+        }),
+      );
 
       return new BudgetOverviewDto({
         year,
         sectionsComputed,
-        sectionsEditable
+        sectionsEditable,
       });
-
     } catch (error) {
       this.logger.error('Error getting budget overview', error);
       if (error instanceof NotFoundException) throw error;
-      if( error instanceof UnprocessableEntityException) throw error;
+      if (error instanceof UnprocessableEntityException) throw error;
       throw new InternalServerErrorException('Error getting budget overview');
     }
   }
@@ -267,28 +306,31 @@ export class BudgetGroupsService {
   async reorderGroups(id: string, groups: BudgetGroupPositionDto[]) {
     try {
       await this.sequelize.transaction(async (tx) => {
-        
-        const groupIds = groups.map(g => g.id);
+        const groupIds = groups.map((g) => g.id);
         const existingGroups = await this.model.findAll({
           where: { id: groupIds, userId: id },
-          transaction: tx
+          transaction: tx,
         });
 
         if (existingGroups.length !== groups.length) {
-          throw new NotFoundException('Some budget groups not found or do not belong to the user');
+          throw new NotFoundException(
+            'Some budget groups not found or do not belong to the user',
+          );
         }
 
-        const positions = groups.map(g => g.position);
+        const positions = groups.map((g) => g.position);
         if (new Set(positions).size !== positions.length) {
           throw new UnprocessableEntityException('Positions must be unique');
         }
 
-        await Promise.all(groups.map(groupDto =>
-          this.model.update(
-            { position: groupDto.position },
-            { where: { id: groupDto.id, userId: id }, transaction: tx }
-          )
-        ));
+        await Promise.all(
+          groups.map((groupDto) =>
+            this.model.update(
+              { position: groupDto.position },
+              { where: { id: groupDto.id, userId: id }, transaction: tx },
+            ),
+          ),
+        );
 
         await this.reorganizeGroupPositions(id, tx);
       });
@@ -299,7 +341,6 @@ export class BudgetGroupsService {
       throw new InternalServerErrorException('Error reordering budget groups');
     }
   }
-
 
   async updateGroupName(id: string, userId: string, title: string) {
     try {
@@ -316,15 +357,33 @@ export class BudgetGroupsService {
     } catch (error) {
       this.logger.error('Error updating budget group name', error);
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException('Error updating budget group name');
+      throw new InternalServerErrorException(
+        'Error updating budget group name',
+      );
     }
   }
 
-  private calculateMonthlyValues(transactions: any[], year: number): MonthlyValues {
+  private calculateMonthlyValues(
+    transactions: any[],
+    year: number,
+  ): MonthlyValues {
     const monthlyValues = createZeroYear();
-    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    
-    transactions.forEach(transaction => {
+    const monthNames = [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
+
+    transactions.forEach((transaction) => {
       const transactionDate = new Date(transaction.depositedDate);
       if (transactionDate.getFullYear() === year) {
         const monthIndex = transactionDate.getMonth();
@@ -336,11 +395,14 @@ export class BudgetGroupsService {
     return monthlyValues;
   }
 
-  private async reorganizeGroupPositions(userId: string, tx: Transaction): Promise<void> {
+  private async reorganizeGroupPositions(
+    userId: string,
+    tx: Transaction,
+  ): Promise<void> {
     const groups = await this.model.findAll({
       where: { userId },
       order: [['position', 'ASC']],
-      transaction: tx
+      transaction: tx,
     });
 
     for (let i = 0; i < groups.length; i++) {

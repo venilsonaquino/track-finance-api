@@ -16,11 +16,17 @@ export class BudgetGroupFacade {
     return this.service.findAllByUser(userId);
   }
 
-  async syncCategoryAssignments(syncDto: SyncCategoryAssignmentsDto, userId: string) {
+  async syncCategoryAssignments(
+    syncDto: SyncCategoryAssignmentsDto,
+    userId: string,
+  ) {
     return this.service.syncCategoryAssignments(syncDto, userId);
   }
 
-  async getBudgetOverview(userId: string, year?: number): Promise<BudgetOverviewDto> {
+  async getBudgetOverview(
+    userId: string,
+    year?: number,
+  ): Promise<BudgetOverviewDto> {
     return this.service.getBudgetOverview(userId, year);
   }
 }

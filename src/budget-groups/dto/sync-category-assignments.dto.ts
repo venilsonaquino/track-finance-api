@@ -1,4 +1,10 @@
-import { IsArray, ArrayNotEmpty, ValidateNested, IsString, IsOptional } from 'class-validator';
+import {
+  IsArray,
+  ArrayNotEmpty,
+  ValidateNested,
+  IsString,
+  IsOptional,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AssignmentItem {
