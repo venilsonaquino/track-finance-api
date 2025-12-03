@@ -26,6 +26,11 @@ export class WalletsService {
     userId: string,
   ): Promise<WalletResponseDto> {
     try {
+      this.logger.log(
+        `Creating wallet user=${userId} name=${createWalletDto.name} initialBalance=${createWalletDto.balance}`,
+        WalletsService.name,
+      );
+
       const walletEntity = new WalletEntity({
         name: createWalletDto.name,
         description: createWalletDto.description,
@@ -36,9 +41,20 @@ export class WalletsService {
       });
 
       const created = await this.walletModel.create(walletEntity);
-      return WalletMapper.toResponse(created);
+      const response = WalletMapper.toResponse(created);
+
+      this.logger.log(
+        `Wallet created id=${response.id} user=${userId} balance=${response.balance}`,
+        WalletsService.name,
+      );
+
+      return response;
     } catch (error) {
-      console.error('Error creating wallet:', error);
+      this.logger.error(
+        `Error creating wallet for user=${userId}`,
+        error?.stack,
+        WalletsService.name,
+      );
       throw new InternalServerErrorException('Failed to create wallet');
     }
   }
@@ -62,8 +78,23 @@ export class WalletsService {
     updateWalletDto: UpdateWalletDto,
     userId: string,
   ): Promise<WalletResponseDto> {
+
+    this.logger.log(
+      `Updating wallet id=${id} user=${userId} name=${updateWalletDto.name} balance=${updateWalletDto.balance}`,
+      WalletsService.name,
+    );
+
+    const walletEntity = new WalletEntity({
+      name: updateWalletDto.name,
+      description: updateWalletDto.description,
+      walletType: updateWalletDto.walletType,
+      balance: updateWalletDto.balance,
+      userId: userId,
+      bankId: updateWalletDto.bankId || null,
+    });
+
     const [affectedCount, updated] = await this.walletModel.update(
-      updateWalletDto,
+      walletEntity,
       {
         where: { id, userId },
         returning: true,
