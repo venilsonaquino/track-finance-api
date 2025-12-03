@@ -11,7 +11,7 @@ class MoneyHelper {
    * Converts a value in cents to BRL.
    * Example: 1234 => 12.34
    */
-  static fromCents(cents: number): number {
+  static centsToAmount(cents: number): number {
     return cents / 100;
   }
 

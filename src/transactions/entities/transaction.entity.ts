@@ -116,6 +116,29 @@ export class TransactionEntity {
     return income + expense;
   }
 
+  public static resolveBalanceDelta(
+    amount: number,
+    transactionType?: string,
+  ): number {
+    const normalizedType = transactionType?.toUpperCase();
+
+    if (normalizedType) {
+      if (['INCOME', 'ENTRY', 'CREDIT'].includes(normalizedType)) {
+        return Math.abs(amount);
+      }
+
+      if (
+        ['OUTCOME', 'EXPENSE', 'DEBIT', 'WITHDRAW', 'PAYMENT'].includes(
+          normalizedType,
+        )
+      ) {
+        return -Math.abs(amount);
+      }
+    }
+
+    return amount;
+  }
+
   private calculateInstallmentEndDate(): string {
     const startDate = new Date(this.depositedDate);
 

@@ -96,4 +96,8 @@ export class CreateTransactionDto {
 
   @Validate(TransactionTypeConstraint)
   transactionTypeCheck: boolean; // para testar o validator
+
+  @IsOptional()
+  @IsBoolean()
+  affectBalance: boolean;
 }
