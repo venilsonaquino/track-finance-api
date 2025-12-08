@@ -2,20 +2,24 @@ import {
   IsDefined,
   IsNotEmpty,
   IsString,
-  IsDateString,
-  IsBoolean,
   IsNumber,
   IsOptional,
   IsEnum,
+  ValidateIf,
+  ValidateNested,
+  IsBoolean,
+  IsDateString,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
+import { InstallmentInfoDto } from 'src/Installments/dtos/installment-info.dto';
 
 export class CreateTransactionDto {
+
   @IsNotEmpty()
-  @IsDefined()
-  @IsDateString()
-  depositedDate: string;
+  @IsEnum(['single', 'installment'])
+  mode: 'single' | 'installment';
 
   @IsNotEmpty()
   @IsDefined()
@@ -50,37 +54,47 @@ export class CreateTransactionDto {
   @IsString()
   walletId: string;
 
+  // @ValidateIf((o) => o.mode === CreateTransactionMode.Single)
   @IsNotEmpty()
-  @IsOptional()
-  @IsString()
-  fitId: string;
-
-  @IsOptional()
-  @IsString()
-  @IsOptional()
-  accountId: string;
-
-  @IsOptional()
-  @IsString()
-  accountType: string;
-
-  @IsOptional()
-  @IsString()
-  bankId: string;
-
-  @IsOptional()
-  @IsString()
-  bankName: string;
-
-  @IsOptional()
-  @IsString()
-  currency: string;
-
-  @IsOptional()
-  @IsString()
-  transactionDate: string;
+  @IsDateString()
+  depositedDate?: string;
 
   @IsOptional()
   @IsBoolean()
-  affectBalance: boolean;
+  affectBalance?: boolean;
+
+  // @ValidateIf((o) => o.mode === CreateTransactionMode.Installment)
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => InstallmentInfoDto)
+  installment: InstallmentInfoDto;
+
+
+
+  /* METADADOS BANCÁRIOS */
+  @IsNotEmpty()
+  @IsOptional()
+  @IsString()
+  fitId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsOptional()
+  accountId?: string;
+
+  @IsOptional()
+  @IsString()
+  accountType?: string;
+
+  @IsOptional()
+  @IsString()
+  bankId?: string;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }
