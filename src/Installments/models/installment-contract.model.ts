@@ -6,6 +6,7 @@ import {
   PrimaryKey,
   ForeignKey,
   BelongsTo,
+  HasMany,
 } from 'sequelize-typescript';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { CategoryModel } from 'src/categories/models/category.model';
@@ -16,6 +17,7 @@ import { WalletModel } from 'src/wallets/models/wallet.model';
 import { InstallmentContractStatus } from '../enums/installment-contract-status.enum';
 import { InstallmentInterval } from '../enums/installment-interval.enum';
 import { ulid } from 'ulid';
+import { InstallmentOccurrenceModel } from './installment-occurrence.model';
 
 @Table({
   tableName: 'installment_contracts',
@@ -23,7 +25,7 @@ import { ulid } from 'ulid';
 export class InstallmentContractModel extends Model<InstallmentContractModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;
@@ -60,7 +62,7 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
 
   @Column({
     field: 'total_amount',
-    type: DataType.FLOAT,
+    type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
   totalAmount: number;
@@ -112,4 +114,7 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
 
   @BelongsTo(() => CategoryModel)
   category: CategoryEntity;
+
+  @HasMany(() => InstallmentOccurrenceModel, { foreignKey: 'contractId' })
+  occurrences: InstallmentOccurrenceModel[];
 }

@@ -7,7 +7,6 @@ import {
   ForeignKey,
   BelongsTo,
 } from 'sequelize-typescript';
-import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { ulid } from 'ulid';
 import { InstallmentContractModel } from './installment-contract.model';
@@ -15,11 +14,17 @@ import { InstallmentOccurrenceStatus } from '../enums/installment-occurrence-sta
 
 @Table({
   tableName: 'installment_occurrences',
+  indexes: [
+    {
+      unique: true,
+      fields: ['contract_id', 'installment_index'],
+    },
+  ],
 })
 export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;
@@ -47,7 +52,7 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
   dueDate: string;
 
   @Column({
-    type: DataType.FLOAT,
+    type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
   amount: number;
@@ -76,5 +81,5 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
   contract: InstallmentContractModel;
 
   @BelongsTo(() => TransactionModel)
-  transaction: TransactionEntity;
+  transaction: TransactionModel;
 }
