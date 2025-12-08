@@ -6,12 +6,10 @@ import {
   IsBoolean,
   IsNumber,
   IsOptional,
-  ValidateIf,
-  Validate,
-  IsIn,
-  Min,
+  IsEnum,
 } from 'class-validator';
-import { TransactionTypeConstraint } from '../validators/validate-transaction-type.constraint';
+import { TransactionStatus } from '../enums/transaction-status.enum';
+import { TransactionType } from '../enums/transaction-type.enum';
 
 export class CreateTransactionDto {
   @IsNotEmpty()
@@ -29,26 +27,18 @@ export class CreateTransactionDto {
   @IsNumber()
   amount: number;
 
-  @IsOptional()
-  @IsBoolean()
-  isRecurring: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isInstallment: boolean;
-
-  @ValidateIf((o) => o.isInstallment === true)
+  @IsNotEmpty()
   @IsDefined()
-  @IsNumber()
-  @Min(1)
-  installmentNumber: number | null;
-
-  @ValidateIf((o) => o.isInstallment === true)
-  @IsIn(['DAILY', 'MONTHLY', 'WEEKLY', 'YEARLY'], {
-    message:
-      'installmentInterval must be one of: DAILY, MONTHLY, WEEKLY, YEARLY',
+  @IsEnum(TransactionType, {
+    message: 'transactionType must be one of: INCOME, EXPENSE, TRANSFER',
   })
-  installmentInterval: 'DAILY' | 'MONTHLY' | 'WEEKLY' | 'YEARLY' | null;
+  transactionType: TransactionType;
+
+  @IsOptional()
+  @IsEnum(TransactionStatus, {
+    message: 'transactionStatus must be one of: POSTED, REVERSED',
+  })
+  transactionStatus?: TransactionStatus;
 
   @IsNotEmpty()
   @IsDefined()
@@ -89,13 +79,6 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsString()
   transactionDate: string;
-
-  @IsOptional()
-  @IsString()
-  transactionType: string;
-
-  @Validate(TransactionTypeConstraint)
-  transactionTypeCheck: boolean; // para testar o validator
 
   @IsOptional()
   @IsBoolean()

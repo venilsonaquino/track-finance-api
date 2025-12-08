@@ -14,6 +14,8 @@ import { groupTransactionsAsArray } from 'src/common/utils/group-transaction-by-
 import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { TransactionMapper } from './mappers/transaction.mapper';
 import { LoggerService } from 'src/config/logging/logger.service';
+import { TransactionStatus } from './enums/transaction-status.enum';
+import { TransactionType } from './enums/transaction-type.enum';
 
 @Injectable()
 export class TransactionsService {
@@ -39,21 +41,20 @@ export class TransactionsService {
         categoryId: createTransactionDto.categoryId,
         fitId: createTransactionDto.fitId,
         walletId: createTransactionDto.walletId,
-        isRecurring: createTransactionDto.isRecurring,
-        isInstallment: createTransactionDto.isInstallment,
-        installmentNumber: createTransactionDto.installmentNumber,
-        installmentInterval: createTransactionDto.installmentInterval,
+        transactionType: createTransactionDto.transactionType,
+        transactionStatus:
+          createTransactionDto.transactionStatus ?? TransactionStatus.Posted,
         accountId: createTransactionDto.accountId,
         accountType: createTransactionDto.accountType,
         bankId: createTransactionDto.bankId,
         bankName: createTransactionDto.bankName,
         currency: createTransactionDto.currency,
         transactionDate: createTransactionDto.transactionDate,
-        transactionType: createTransactionDto.transactionType,
       });
 
-      const createdTransaction =
-        await this.transactionalModel.create(transaction);
+      const createdTransaction = await this.transactionalModel.create(
+        transaction as any,
+      );
 
       if (createTransactionDto.affectBalance) {
         this.logger.log(
@@ -100,24 +101,22 @@ export class TransactionsService {
           categoryId: dto.categoryId,
           fitId: dto.fitId,
           walletId: dto.walletId,
-          isRecurring: dto.isRecurring,
-          isInstallment: dto.isInstallment,
-          installmentNumber: dto.installmentNumber,
-          installmentInterval: dto.installmentInterval,
+          transactionType: dto.transactionType,
+          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
           accountId: dto.accountId,
           accountType: dto.accountType,
           bankId: dto.bankId,
           bankName: dto.bankName,
           currency: dto.currency,
           transactionDate: dto.transactionDate,
-          transactionType: dto.transactionType,
         });
 
         return transaction;
       });
 
-      const createdTransactions =
-        await this.transactionalModel.bulkCreate(transactions);
+      const createdTransactions = await this.transactionalModel.bulkCreate(
+        transactions as any,
+      );
 
       for (const dto of createTransactionDtos) {
         if (!dto.affectBalance) {
@@ -227,15 +226,22 @@ export class TransactionsService {
       depositedDate: updateTransactionDto.depositedDate,
       description: updateTransactionDto.description,
       amount: +updateTransactionDto.amount,
-      isRecurring: updateTransactionDto.isRecurring,
       userId: userId,
       categoryId: updateTransactionDto.categoryId,
       fitId: updateTransactionDto.fitId,
       walletId: updateTransactionDto.walletId,
+      transactionType: updateTransactionDto.transactionType,
+      transactionStatus: updateTransactionDto.transactionStatus,
+      accountId: updateTransactionDto.accountId,
+      accountType: updateTransactionDto.accountType,
+      bankId: updateTransactionDto.bankId,
+      bankName: updateTransactionDto.bankName,
+      currency: updateTransactionDto.currency,
+      transactionDate: updateTransactionDto.transactionDate,
     });
 
     const [affectedCount, updated] = await this.transactionalModel.update(
-      transaction,
+      transaction as any,
       {
         where: { id, userId },
         returning: true,

@@ -7,22 +7,13 @@ export class TransactionMapper {
       id: model.id,
       depositedDate: model.depositedDate,
       description: model.description,
-      amount: model.amount,
       userId: model.userId,
       categoryId: model.categoryId,
       walletId: model.walletId,
-      isRecurring: model.isRecurring,
       fitId: model.fitId,
-      isInstallment: model.isInstallment,
-      installmentInterval: model.installmentInterval as
-        | 'DAILY'
-        | 'MONTHLY'
-        | 'WEEKLY'
-        | 'YEARLY',
-      installmentNumber: model.installmentNumber,
-      installmentEndDate: model.installmentEndDate,
       transactionDate: model.transactionDate,
       transactionType: model.transactionType,
+      transactionStatus: model.transactionStatus,
       accountId: model.accountId,
       accountType: model.accountType,
       bankId: model.bankId,
