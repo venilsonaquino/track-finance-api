@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile.prod
     container_name: track-finance-api
     ports:
       - "8080:8080"
