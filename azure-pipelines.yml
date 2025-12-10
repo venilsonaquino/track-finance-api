@@ -7,10 +7,10 @@ trigger:
 - main
 
 pool:
-  vmImage: homelab
+  name: homelab
 
 steps:
   - checkout: self
 
-  - script: echo "Pipeline funcionando no meu homelab!"
-    displayName: "Teste"
+  - script: echo "Pipeline running on my homelab!"
+    displayName: "Test"
