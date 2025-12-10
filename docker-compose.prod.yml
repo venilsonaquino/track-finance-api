@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prod
+    container_name: track-finance-api
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+    networks:
+      - trackfinannet
+    restart: always
+
+  postgres:
+    image: postgres
+    container_name: track_finan_postgres
+    volumes:
+      - track_finan_postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "root"
+      POSTGRES_USER: "root"
+      POSTGRES_DB: "trackfinan"
+    ports:
+      - "5432:5432"
+    networks:
+      - trackfinannet
+    restart: always
+
+networks:
+  trackfinannet:
+    driver: bridge
+
+volumes:
+  track_finan_postgres:
+    driver: local
