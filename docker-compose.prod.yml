@@ -3,7 +3,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/Dockerfile.prod
+      dockerfile: Dockerfile
     container_name: track-finance-api
     env_file:
       - .env.prod
