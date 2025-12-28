@@ -142,6 +142,8 @@ export class TransactionModel extends Model<TransactionModel> {
     type: DataType.STRING,
     allowNull: true,
   })
+  transactionStatus: string;
+
   @ForeignKey(() => UserModel)
   @Column({
     field: 'user_id',
