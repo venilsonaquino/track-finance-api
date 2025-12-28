@@ -55,7 +55,7 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
-  amount: number;
+  amount: string;
 
   @Column({
     type: DataType.ENUM,
@@ -74,12 +74,13 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     field: 'transaction_id',
     type: DataType.STRING(26),
     allowNull: true,
+    defaultValue: null,
   })
   transactionId: string | null;
 
   @BelongsTo(() => InstallmentContractModel)
   contract: InstallmentContractModel;
 
-  @BelongsTo(() => TransactionModel)
-  transaction: TransactionModel;
+  @BelongsTo(() => TransactionModel, { as: 'transaction' })
+  transaction?: TransactionModel;
 }

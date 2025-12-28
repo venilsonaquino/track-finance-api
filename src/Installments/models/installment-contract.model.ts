@@ -65,14 +65,14 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
     type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
-  totalAmount: number;
+  totalAmount: string;
 
   @Column({
-    field: 'installment_number',
+    field: 'installment_count',
     type: DataType.INTEGER,
     allowNull: false,
   })
-  installmentNumber: number;
+  installmentsCount: number;
 
   @Column({
     field: 'installment_interval',

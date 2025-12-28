@@ -6,7 +6,7 @@ import {
   PrimaryKey,
   ForeignKey,
   BelongsTo,
-  HasMany,
+  HasOne,
 } from 'sequelize-typescript';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { CategoryModel } from 'src/categories/models/category.model';
@@ -154,7 +154,7 @@ export class TransactionModel extends Model<TransactionModel> {
   @BelongsTo(() => WalletModel)
   wallet: WalletEntity;
 
-  @HasMany(() => InstallmentOccurrenceModel, { foreignKey: 'contractId' })
-  ccurrences: InstallmentOccurrenceModel[];
+  @HasOne(() => InstallmentOccurrenceModel, { foreignKey: 'transactionId', as: 'installmentOccurrence' })
+  installmentOccurrence?: InstallmentOccurrenceModel;
 }
   
