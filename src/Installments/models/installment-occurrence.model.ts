@@ -41,6 +41,9 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     field: 'installment_index',
     type: DataType.INTEGER,
     allowNull: false,
+    validate: {
+      min: 1,
+    },
   })
   installmentIndex: number;
 
@@ -78,9 +81,9 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
   })
   transactionId: string | null;
 
-  @BelongsTo(() => InstallmentContractModel)
+  @BelongsTo(() => InstallmentContractModel, { foreignKey: 'contractId', as: 'contract' })
   contract: InstallmentContractModel;
 
-  @BelongsTo(() => TransactionModel, { as: 'transaction' })
+  @BelongsTo(() => TransactionModel, { foreignKey: 'transactionId', as: 'transaction' })
   transaction?: TransactionModel;
 }

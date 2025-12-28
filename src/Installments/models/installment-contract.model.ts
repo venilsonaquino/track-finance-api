@@ -115,6 +115,6 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
   @BelongsTo(() => CategoryModel)
   category: CategoryEntity;
 
-  @HasMany(() => InstallmentOccurrenceModel, { foreignKey: 'contractId' })
+  @HasMany(() => InstallmentOccurrenceModel, { foreignKey: 'contractId', as: 'occurrences' })
   occurrences: InstallmentOccurrenceModel[];
 }
