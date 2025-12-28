@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/Dockerfile.prod
+      dockerfile: docker/Dockerfile.dev
     container_name: track-finance-api
     volumes:
       - ./:/app
