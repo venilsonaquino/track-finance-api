@@ -11,10 +11,12 @@ import { WalletsModule } from './wallets/wallets.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from './config/logging/logger.module';
 import { InstallmentsModule } from './Installments/installments.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
     LoggerModule,
+    HealthModule,
     EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
