@@ -49,7 +49,7 @@ export class TransactionsService {
         bankId: createTransactionDto.bankId,
         bankName: createTransactionDto.bankName,
         currency: createTransactionDto.currency,
-        transactionDate: createTransactionDto.transactionDate,
+        // transactionDate: createTransactionDto.transactionDate,
       });
 
       const createdTransaction = await this.transactionalModel.create(
@@ -108,7 +108,7 @@ export class TransactionsService {
           bankId: dto.bankId,
           bankName: dto.bankName,
           currency: dto.currency,
-          transactionDate: dto.transactionDate,
+          // transactionDate: dto.transactionDate,
         });
 
         return transaction;
@@ -237,7 +237,7 @@ export class TransactionsService {
       bankId: updateTransactionDto.bankId,
       bankName: updateTransactionDto.bankName,
       currency: updateTransactionDto.currency,
-      transactionDate: updateTransactionDto.transactionDate,
+      // transactionDate: updateTransactionDto.transactionDate,
     });
 
     const [affectedCount, updated] = await this.transactionalModel.update(
