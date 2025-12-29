@@ -77,13 +77,17 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     field: 'transaction_id',
     type: DataType.STRING(26),
     allowNull: true,
-    defaultValue: null,
   })
   transactionId: string | null;
 
   @BelongsTo(() => InstallmentContractModel, { foreignKey: 'contractId', as: 'contract' })
   contract: InstallmentContractModel;
 
-  @BelongsTo(() => TransactionModel, { foreignKey: 'transactionId', as: 'transaction' })
+  @BelongsTo(() => TransactionModel, { 
+    foreignKey: 'transactionId', 
+    as: 'transaction' ,
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+  })
   transaction?: TransactionModel;
 }
