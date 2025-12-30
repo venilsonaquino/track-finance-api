@@ -4,9 +4,9 @@ import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
 import { InstallmentOccurrenceModel } from './models/installment-occurrence.model';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
-import { InstallmentContractStatus } from './enums/installment-contract-status.enum';
 import { InstallmentOccurrenceStatus } from './enums/installment-occurrence-status.enum';
-import { InstallmentInterval } from './enums/installment-interval.enum';
+import { generateDueDates } from 'src/common/utils/generate-due-dates';
+import { ContractStatus } from './enums/contract-status.enum';
 
 
 @Injectable()
@@ -33,7 +33,7 @@ export class ContractsService {
           installmentsCount: dto.installmentsCount,
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
-          status: InstallmentContractStatus.Active,
+          status: ContractStatus.Active,
         },
         { transaction: t },
       );
@@ -46,7 +46,7 @@ export class ContractsService {
           dto.installmentsCount,
         );
 
-        const dueDates = this.generateDueDates(
+        const dueDates = generateDueDates(
           dto.firstDueDate,
           dto.installmentInterval,
           dto.installmentsCount,
@@ -91,40 +91,5 @@ export class ContractsService {
     const intPart = Math.floor(cents / 100);
     const decPart = String(cents % 100).padStart(2, '0');
     return `${intPart}.${decPart}`;
-  }
-
-  private generateDueDates(
-    firstDueDate: string,
-    interval: InstallmentInterval,
-    count: number,
-  ): string[] {
-    const dates: string[] = [];
-    const [y, m, d] = firstDueDate.split('-').map(Number);
-
-    // usa Date UTC pra não sofrer com timezone local
-    const base = new Date(Date.UTC(y, m - 1, d));
-
-    for (let i = 0; i < count; i++) {
-      const dt = new Date(base.getTime());
-
-      switch (interval) {
-        case InstallmentInterval.Daily:
-          dt.setUTCDate(dt.getUTCDate() + i);
-          break;
-        case InstallmentInterval.Weekly:
-          dt.setUTCDate(dt.getUTCDate() + i * 7);
-          break;
-        case InstallmentInterval.Monthly:
-          dt.setUTCMonth(dt.getUTCMonth() + i);
-          break;
-        case InstallmentInterval.Yearly:
-          dt.setUTCFullYear(dt.getUTCFullYear() + i);
-          break;
-      }
-
-      dates.push(dt.toISOString().slice(0, 10));
-    }
-
-    return dates;
   }
 }

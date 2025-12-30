@@ -61,6 +61,7 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
   amount: string;
 
   @Column({
+    field: 'installment_status',
     type: DataType.ENUM,
     values: [
       InstallmentOccurrenceStatus.Scheduled,
@@ -70,7 +71,7 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     allowNull: false,
     defaultValue: InstallmentOccurrenceStatus.Scheduled,
   })
-  status: InstallmentOccurrenceStatus;
+  installmentStatus: InstallmentOccurrenceStatus;
 
   @ForeignKey(() => TransactionModel)
   @Column({

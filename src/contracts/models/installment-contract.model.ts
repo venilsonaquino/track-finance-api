@@ -14,7 +14,7 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { UserModel } from 'src/users/models/user.model';
 import { WalletEntity } from 'src/wallets/entities/wallet.entity';
 import { WalletModel } from 'src/wallets/models/wallet.model';
-import { InstallmentContractStatus } from '../enums/installment-contract-status.enum';
+import { ContractStatus } from '../enums/contract-status.enum';
 import { InstallmentInterval } from '../enums/installment-interval.enum';
 import { ulid } from 'ulid';
 import { InstallmentOccurrenceModel } from './installment-occurrence.model';
@@ -97,14 +97,14 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
   @Column({
     type: DataType.ENUM,
     values: [
-      InstallmentContractStatus.Active,
-      InstallmentContractStatus.Cancelled,
-      InstallmentContractStatus.Finished,
+      ContractStatus.Active,
+      ContractStatus.Cancelled,
+      ContractStatus.Finished,
     ],
     allowNull: false,
-    defaultValue: InstallmentContractStatus.Active,
+    defaultValue: ContractStatus.Active,
   })
-  status: InstallmentContractStatus;
+  status: ContractStatus;
 
   @BelongsTo(() => UserModel)
   user: UserEntity;
