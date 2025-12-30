@@ -10,7 +10,7 @@ import { FilesModule } from './files/files.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from './config/logging/logger.module';
-import { InstallmentsModule } from './Installments/installments.module';
+import { ContractsModule } from './contracts/contracts.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -54,7 +54,7 @@ import { HealthModule } from './health/health.module';
     BudgetGroupsModule,
     FilesModule,
     WalletsModule,
-    InstallmentsModule,
+    ContractsModule,
   ],
   controllers: [],
   providers: [],

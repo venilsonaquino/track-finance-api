@@ -13,7 +13,7 @@ import {
 import { Type } from 'class-transformer';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
-import { InstallmentInfoDto } from 'src/Installments/dtos/installment-info.dto';
+import { InstallmentInfoDto } from 'src/contracts/dtos/installment-info.dto';
 
 export class CreateTransactionDto {
 

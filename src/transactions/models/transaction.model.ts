@@ -17,7 +17,7 @@ import { WalletModel } from 'src/wallets/models/wallet.model';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
 import { ulid } from 'ulid';
-import { InstallmentOccurrenceModel } from 'src/Installments/models/installment-occurrence.model';
+import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occurrence.model';
 
 @Table({
   tableName: 'transactions',

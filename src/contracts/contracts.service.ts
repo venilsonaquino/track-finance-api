@@ -10,7 +10,7 @@ import { InstallmentInterval } from './enums/installment-interval.enum';
 
 
 @Injectable()
-export class InstallmentContractsService {
+export class ContractsService {
   constructor(
     private readonly sequelize: Sequelize,
     @InjectModel(InstallmentContractModel)
@@ -19,13 +19,13 @@ export class InstallmentContractsService {
     private readonly occurrenceRepo: typeof InstallmentOccurrenceModel,
   ) {}
 
-  async createContract(dto: CreateInstallmentContractDto) {
+  async createInstallmentContract(dto: CreateInstallmentContractDto, userId: string) {
     const generateOccurrences = dto.generateOccurrences ?? true;
 
     return this.sequelize.transaction(async (t) => {
       const contract = await this.contractRepo.create(
         {
-          userId: this.getUserIdOrThrow(), // 👈 adapte (JWT)
+          userId: userId,
           walletId: dto.walletId,
           categoryId: dto.categoryId,
           description: dto.description,
@@ -70,12 +70,6 @@ export class InstallmentContractsService {
         occurrences,
       };
     });
-  }
-
-  // ✅ Melhor pegar do request (AuthGuard). Aqui é só placeholder.
-  private getUserIdOrThrow(): string {
-    // return req.user.id
-    return 'TODO_USER_ID';
   }
 
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
