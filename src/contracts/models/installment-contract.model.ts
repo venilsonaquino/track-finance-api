@@ -14,8 +14,8 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { UserModel } from 'src/users/models/user.model';
 import { WalletEntity } from 'src/wallets/entities/wallet.entity';
 import { WalletModel } from 'src/wallets/models/wallet.model';
-import { ContractStatus } from '../enums/contract-status.enum';
-import { InstallmentInterval } from '../enums/installment-interval.enum';
+import { ContractStatusEnum } from '../enums/contract-status.enum';
+import { IntervalEnum } from '../enums/interval.enum';
 import { ulid } from 'ulid';
 import { InstallmentOccurrenceModel } from './installment-occurrence.model';
 
@@ -78,15 +78,14 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
     field: 'installment_interval',
     type: DataType.ENUM,
     values: [
-      InstallmentInterval.Daily,
-      InstallmentInterval.Weekly,
-      InstallmentInterval.Monthly,
-      InstallmentInterval.Yearly,
+      IntervalEnum.Daily,
+      IntervalEnum.Weekly,
+      IntervalEnum.Monthly,
+      IntervalEnum.Yearly,
     ],
     allowNull: false,
   })
-  installmentInterval: InstallmentInterval;
-
+  installmentInterval: IntervalEnum;
   @Column({
     field: 'first_due_date',
     type: DataType.DATEONLY,
@@ -97,14 +96,14 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
   @Column({
     type: DataType.ENUM,
     values: [
-      ContractStatus.Active,
-      ContractStatus.Cancelled,
-      ContractStatus.Finished,
+      ContractStatusEnum.Active,
+      ContractStatusEnum.Cancelled,
+      ContractStatusEnum.Finished,
     ],
     allowNull: false,
-    defaultValue: ContractStatus.Active,
+    defaultValue: ContractStatusEnum.Active,
   })
-  status: ContractStatus;
+  status: ContractStatusEnum;
 
   @BelongsTo(() => UserModel)
   user: UserEntity;

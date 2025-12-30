@@ -1,6 +1,6 @@
 import { ulid } from 'ulid';
-import { ContractStatus } from '../enums/contract-status.enum';
-import { InstallmentInterval } from '../enums/installment-interval.enum';
+import { ContractStatusEnum } from '../enums/contract-status.enum';
+import { IntervalEnum } from '../enums/interval.enum';
 import { InstallmentOccurrenceEntity } from './installment-occurrence.entity';
 
 export class InstallmentContractEntity {
@@ -11,9 +11,9 @@ export class InstallmentContractEntity {
   description?: string;
   totalAmount: number;
   installmentNumber: number;
-  installmentInterval: InstallmentInterval;
+  installmentInterval: IntervalEnum;
   firstDueDate: string;
-  status: ContractStatus;
+  status: ContractStatusEnum;
   occurrences?: InstallmentOccurrenceEntity[];
 
   constructor(
@@ -25,9 +25,9 @@ export class InstallmentContractEntity {
       description?: string;
       totalAmount: number;
       installmentNumber: number;
-      installmentInterval: InstallmentInterval;
+      installmentInterval: IntervalEnum;
       firstDueDate: string;
-      status: ContractStatus;
+      status: ContractStatusEnum;
       occurrences?: InstallmentOccurrenceEntity[];
     }>,
   ) {
@@ -40,7 +40,7 @@ export class InstallmentContractEntity {
     this.installmentNumber = params.installmentNumber;
     this.installmentInterval = params.installmentInterval;
     this.firstDueDate = params.firstDueDate;
-    this.status = params.status || ContractStatus.Active;
+    this.status = params.status || ContractStatusEnum.Active;
     this.occurrences = params.occurrences;
   }
 }

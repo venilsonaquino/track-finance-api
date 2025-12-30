@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
-import { InstallmentInterval } from '../enums/installment-interval.enum';
+import { IntervalEnum } from '../enums/interval.enum';
 
 export class CreateInstallmentContractDto {
   @IsString()
@@ -23,8 +23,8 @@ export class CreateInstallmentContractDto {
   @Min(2)
   installmentsCount: number;
 
-  @IsEnum(InstallmentInterval)
-  installmentInterval: InstallmentInterval;
+  @IsEnum(IntervalEnum)
+  installmentInterval: IntervalEnum;
 
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'firstDueDate must be in YYYY-MM-DD format' })

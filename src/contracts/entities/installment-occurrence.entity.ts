@@ -1,5 +1,5 @@
 import { ulid } from 'ulid';
-import { InstallmentOccurrenceStatus } from '../enums/installment-occurrence-status.enum';
+import { OccurrenceStatusEnum } from '../enums/installment-occurrence-status.enum';
 import { InstallmentContractEntity } from './installment-contract.entity';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 
@@ -9,7 +9,7 @@ export class InstallmentOccurrenceEntity {
   installmentIndex: number;
   dueDate: string;
   amount: number;
-  status: InstallmentOccurrenceStatus;
+  status: OccurrenceStatusEnum;
   transactionId?: string | null;
   contract?: InstallmentContractEntity;
   transaction?: TransactionEntity;
@@ -21,7 +21,7 @@ export class InstallmentOccurrenceEntity {
       installmentIndex: number;
       dueDate: string;
       amount: number;
-      status: InstallmentOccurrenceStatus;
+      status: OccurrenceStatusEnum;
       transactionId?: string | null;
       contract?: InstallmentContractEntity;
       transaction?: TransactionEntity;
@@ -32,7 +32,7 @@ export class InstallmentOccurrenceEntity {
     this.installmentIndex = params.installmentIndex;
     this.dueDate = params.dueDate;
     this.amount = params.amount;
-    this.status = params.status || InstallmentOccurrenceStatus.Scheduled;
+    this.status = params.status || OccurrenceStatusEnum.Scheduled;
     this.transactionId = params.transactionId;
     this.contract = params.contract;
     this.transaction = params.transaction;

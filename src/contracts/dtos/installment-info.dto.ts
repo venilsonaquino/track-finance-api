@@ -4,7 +4,7 @@ import {
   IsEnum,
   IsNumber,
 } from 'class-validator';
-import { InstallmentInterval } from '../enums/installment-interval.enum';
+import { IntervalEnum } from '../enums/interval.enum';
 
 export class InstallmentInfoDto {
   @IsNotEmpty()
@@ -12,8 +12,8 @@ export class InstallmentInfoDto {
   number: number;
 
   @IsNotEmpty()
-  @IsEnum(InstallmentInterval)
-  interval: InstallmentInterval;
+  @IsEnum(IntervalEnum)
+  interval: IntervalEnum;
 
   @IsNotEmpty()
   @IsDateString()

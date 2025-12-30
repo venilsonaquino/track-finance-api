@@ -1,8 +1,8 @@
-import { InstallmentInterval } from "src/contracts/enums/installment-interval.enum";
+import { IntervalEnum } from "src/contracts/enums/interval.enum";
 
 export function generateDueDates(
     firstDueDate: string,
-    interval: InstallmentInterval,
+    interval: IntervalEnum,
     count: number,
   ): string[] {
     const dates: string[] = [];
@@ -15,16 +15,16 @@ export function generateDueDates(
       const dt = new Date(base.getTime());
 
       switch (interval) {
-        case InstallmentInterval.Daily:
+        case IntervalEnum.Daily:
           dt.setUTCDate(dt.getUTCDate() + i);
           break;
-        case InstallmentInterval.Weekly:
+        case IntervalEnum.Weekly:
           dt.setUTCDate(dt.getUTCDate() + i * 7);
           break;
-        case InstallmentInterval.Monthly:
+        case IntervalEnum.Monthly:
           dt.setUTCMonth(dt.getUTCMonth() + i);
           break;
-        case InstallmentInterval.Yearly:
+        case IntervalEnum.Yearly:
           dt.setUTCFullYear(dt.getUTCFullYear() + i);
           break;
       }

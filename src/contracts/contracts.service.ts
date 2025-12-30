@@ -4,9 +4,9 @@ import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
 import { InstallmentOccurrenceModel } from './models/installment-occurrence.model';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
-import { InstallmentOccurrenceStatus } from './enums/installment-occurrence-status.enum';
+import { OccurrenceStatusEnum } from './enums/installment-occurrence-status.enum';
 import { generateDueDates } from 'src/common/utils/generate-due-dates';
-import { ContractStatus } from './enums/contract-status.enum';
+import { ContractStatusEnum } from './enums/contract-status.enum';
 
 
 @Injectable()
@@ -33,7 +33,7 @@ export class ContractsService {
           installmentsCount: dto.installmentsCount,
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
-          status: ContractStatus.Active,
+          status: ContractStatusEnum.Active,
         },
         { transaction: t },
       );
@@ -58,7 +58,7 @@ export class ContractsService {
             installmentIndex: idx + 1, // 1..N
             dueDate,
             amount: perInstallmentAmount,
-            status: InstallmentOccurrenceStatus.Scheduled,
+            status: OccurrenceStatusEnum.Scheduled,
             transactionId: null,
           })),
           { transaction: t, returning: true },

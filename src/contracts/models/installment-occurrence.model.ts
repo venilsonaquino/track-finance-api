@@ -10,7 +10,7 @@ import {
 import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { ulid } from 'ulid';
 import { InstallmentContractModel } from './installment-contract.model';
-import { InstallmentOccurrenceStatus } from '../enums/installment-occurrence-status.enum';
+import { OccurrenceStatusEnum } from '../enums/installment-occurrence-status.enum';
 
 @Table({
   tableName: 'installment_occurrences',
@@ -64,14 +64,14 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     field: 'installment_status',
     type: DataType.ENUM,
     values: [
-      InstallmentOccurrenceStatus.Scheduled,
-      InstallmentOccurrenceStatus.Posted,
-      InstallmentOccurrenceStatus.Cancelled,
+      OccurrenceStatusEnum.Scheduled,
+      OccurrenceStatusEnum.Posted,
+      OccurrenceStatusEnum.Cancelled,
     ],
     allowNull: false,
-    defaultValue: InstallmentOccurrenceStatus.Scheduled,
+    defaultValue: OccurrenceStatusEnum.Scheduled,
   })
-  installmentStatus: InstallmentOccurrenceStatus;
+  installmentStatus: OccurrenceStatusEnum;
 
   @ForeignKey(() => TransactionModel)
   @Column({
