@@ -4,6 +4,7 @@ import { CreateInstallmentContractDto } from './dtos/create-Installment-contract
 import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -13,5 +14,10 @@ export class ContractsController {
   @Post('installments')
   async create(@Body() dto: CreateInstallmentContractDto, @CurrentUser() user: any) {
     return this.service.createInstallmentContract(dto, user.id);
+  }
+
+  @Post('recurring')
+  async createRecurring(@Body() dto: CreateRecurringContractDto, @CurrentUser() user: any) {
+    return this.service.createRecurringContract(user.id, dto);
   }
 }

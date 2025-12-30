@@ -61,7 +61,6 @@ export class RecurringContractModel extends Model<RecurringContractModel> {
   })
   description: string;
 
-  // valor fixo por ocorrência (ex: "119.90")
   @Column({
     type: DataType.DECIMAL(10, 2),
     allowNull: false,

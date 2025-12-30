@@ -7,6 +7,9 @@ import { CreateInstallmentContractDto } from './dtos/create-Installment-contract
 import { OccurrenceStatusEnum } from './enums/installment-occurrence-status.enum';
 import { generateDueDates } from 'src/common/utils/generate-due-dates';
 import { ContractStatusEnum } from './enums/contract-status.enum';
+import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
+import { RecurringContractModel } from './models/recurring-contract.model';
+import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
 
 
 @Injectable()
@@ -17,6 +20,11 @@ export class ContractsService {
     private readonly contractRepo: typeof InstallmentContractModel,
     @InjectModel(InstallmentOccurrenceModel)
     private readonly occurrenceRepo: typeof InstallmentOccurrenceModel,
+      @InjectModel(RecurringContractModel)
+    private readonly recurringContractRepo: typeof RecurringContractModel,
+
+    @InjectModel(RecurringOccurrenceModel)
+    private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
   ) {}
 
   async createInstallmentContract(dto: CreateInstallmentContractDto, userId: string) {
@@ -71,6 +79,52 @@ export class ContractsService {
       };
     });
   }
+
+  async createRecurringContract(
+    userId: string,
+    dto: CreateRecurringContractDto,
+  ) {
+    const generateAheadCount = dto.generateAheadCount ?? 12;
+
+    return this.sequelize.transaction(async (transaction) => {
+      const contract = await this.recurringContractRepo.create(
+        {
+          userId,
+          walletId: dto.walletId,
+          categoryId: dto.categoryId,
+          description: dto.description,
+          amount: dto.amount,
+          interval: dto.interval,
+          firstDueDate: dto.firstDueDate,
+          status: ContractStatusEnum.Active,
+        },
+        { transaction },
+      );
+
+      const dueDates = generateDueDates(
+        dto.firstDueDate,
+        dto.interval,
+        generateAheadCount,
+      );
+
+      const occurrences = await this.recurringOccurrenceRepo.bulkCreate(
+        dueDates.map((dueDate) => ({
+          contractId: contract.id,
+          dueDate,
+          amount: dto.amount,
+          status: OccurrenceStatusEnum.Scheduled,
+          transactionId: null,
+        })),
+        { transaction, returning: true },
+      );
+
+      return {
+        contract,
+        occurrences,
+      };
+    });
+  }
+
 
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
     // estratégia simples: divide e arredonda 2 casas.
