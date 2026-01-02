@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
 import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
+import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -28,5 +29,15 @@ export class ContractsController {
     @CurrentUser() user: any,
   ) {
     return this.service.getContractOccurrences(contractId, query, user.id);
+  }
+
+  @Patch(':contractId/occurrences/:dueDate')
+  async overrideOccurrence(
+    @Param('contractId') contractId: string,
+    @Param('dueDate') dueDate: string,
+    @Body() dto: UpsertOccurrenceOverrideDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.upsertOccurrenceOverride(contractId, dueDate, dto,user.id);
   }
 }

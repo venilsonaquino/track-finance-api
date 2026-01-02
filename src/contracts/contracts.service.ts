@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
@@ -18,6 +18,8 @@ import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
 import { GetContractOccurrencesResponseDto } from './dtos/get-contract-occurrences-response.dto';
+import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
+import { isDueDateOnSchedule } from 'src/common/utils/is-due-date-on-schedule';
 
 @Injectable()
 export class ContractsService {
@@ -27,9 +29,8 @@ export class ContractsService {
     private readonly contractRepo: typeof InstallmentContractModel,
     @InjectModel(InstallmentOccurrenceModel)
     private readonly occurrenceRepo: typeof InstallmentOccurrenceModel,
-      @InjectModel(RecurringContractModel)
+    @InjectModel(RecurringContractModel)
     private readonly recurringContractRepo: typeof RecurringContractModel,
-
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
   ) {}
@@ -140,7 +141,7 @@ export class ContractsService {
       amount: String(contract.amount),
       status: OccurrenceStatusEnum.Scheduled,
       transactionId: null,
-      source: 'generated',
+      source: 'GENERATED',
     }));
 
     const overridesModels = await this.recurringOccurrenceRepo.findAll({
@@ -156,7 +157,9 @@ export class ContractsService {
 
     const overrides = overridesModels.map((m) => m.get({ plain: true }));
 
-    const items = OccurrenceProjection.project(generated, []);
+    console.log('overrides', overrides);
+
+    const items = OccurrenceProjection.project(generated, overrides);
 
     return {
       contractId: contract.id,
@@ -167,7 +170,84 @@ export class ContractsService {
       items,
     };
   }
-  
+
+  async upsertOccurrenceOverride(
+    contractId: string,
+    dueDate: string,
+    dto: UpsertOccurrenceOverrideDto,
+    userId: string,
+  ): Promise<{
+    contractId: string;
+    occurrence: ContractOccurrenceDto;
+  }> 
+  {
+    // 1) valida dueDate (YYYY-MM-DD)
+    const dueDateObj = parseIsoDateOnly(dueDate);
+    if (!dueDateObj) {
+      throw new BadRequestException('Invalid dueDate. Use YYYY-MM-DD.');
+    }
+
+    // 2) busca contrato do usuário
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId, status: ContractStatusEnum.Active },
+    });
+    if (!contract) throw new NotFoundException('Contract not found.');
+
+    // 3) valida se dueDate cai na “grade” do contrato
+    // (pra não permitir override em uma data que nunca existiria)
+    if (!isDueDateOnSchedule(contract.firstDueDate, contract.interval, dueDate)) {
+      throw new BadRequestException('dueDate is not valid for this contract schedule.');
+    }
+
+    // 4) monta o override final (defaults)
+    const overrideToSave = {
+      contractId: contract.id,
+      dueDate, // DATEONLY string
+      amount: dto.amount ?? String(contract.amount),
+      status: dto.status ?? OccurrenceStatusEnum.Skipped, // << se quiser que PATCH sem body seja skip
+      transactionId: dto.transactionId ?? null,
+    };
+
+    // regra mínima: se status = POSTED, geralmente exige transactionId
+    if (overrideToSave.status === OccurrenceStatusEnum.Posted && !overrideToSave.transactionId) {
+      throw new BadRequestException('transactionId is required when status is POSTED.');
+    }
+
+    // 5) upsert (ideal) - depende do seu repo/model suportar
+    // Se seu Sequelize estiver configurado com unique (contractId, dueDate), upsert funciona bem.
+    const saved = await this.sequelize.transaction(async (transaction) => {
+      // opção A: upsert direto
+      // return await this.occurrenceOverrideRepo.upsert(overrideToSave, { transaction, returning: true });
+
+      // opção B: find + update/create (mais explícito e compatível)
+      const existing = await this.recurringOccurrenceRepo.findOne({
+        where: { contractId: contract.id, dueDate },
+        transaction,
+      });
+
+      if (existing) {
+        await existing.update(overrideToSave, { transaction });
+        return existing;
+      }
+
+      return await this.recurringOccurrenceRepo.create(overrideToSave, { transaction });
+    });
+
+    const plain = saved.get ? saved.get({ plain: true }) : saved;
+
+    return {
+      contractId: contract.id,
+      occurrence: {
+        dueDate: plain.dueDate,
+        amount: String(plain.amount),
+        status: plain.status,
+        transactionId: plain.transactionId ?? null,
+        source: 'OVERRIDE',
+      },
+    };
+  }
+
+
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
     const totalCents = this.toCents(totalAmount);
     const per = Math.floor(totalCents / installmentsCount);
