@@ -26,7 +26,8 @@ export class ContractsController {
     @Param('contractId') contractId: string,
     @Query('from') from: string,
     @Query('to') to: string,
+    @CurrentUser() user: any
   ) {
-    return this.service.getContractOccurrences(contractId, { from, to });
+    return this.service.getContractOccurrences(contractId, { from, to }, user.id);
   }
 }

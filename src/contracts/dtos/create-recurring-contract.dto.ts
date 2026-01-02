@@ -1,5 +1,4 @@
-// src/recurring/dtos/create-recurring-contract.dto.ts
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
 import { IntervalEnum } from '../enums/interval.enum';
 
 export class CreateRecurringContractDto {
@@ -15,7 +14,6 @@ export class CreateRecurringContractDto {
   @IsNotEmpty()
   description: string;
 
-  // DECIMAL como string: "119.90"
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d+(\.\d{1,2})?$/, {
@@ -33,13 +31,4 @@ export class CreateRecurringContractDto {
     message: 'firstDueDate must be in YYYY-MM-DD format',
   })
   firstDueDate: string;
-
-  /**
-   * Quantas ocorrências gerar pra frente ao criar o contrato.
-   * Se não enviar, você define um default (ex: 12).
-   */
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  generateAheadCount?: number;
 }

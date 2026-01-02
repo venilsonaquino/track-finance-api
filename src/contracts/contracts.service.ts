@@ -114,32 +114,31 @@ export class ContractsService {
   async getContractOccurrences(
     contractId: string,
     query: GetOccurrencesQuery,
+    userId: string,
   ): Promise<{
     contractId: string;
     period: { from: string; to: string };
     items: ContractOccurrenceDto[];
   }> {
-    // 1) Validar query
+
     const fromDate = parseIsoDateOnly(query.from);
     const toDate = parseIsoDateOnly(query.to);
 
     if (!fromDate || !toDate) {
       throw new BadRequestException('Invalid from/to. Use YYYY-MM-DD.');
     }
+
     if (fromDate > toDate) {
       throw new BadRequestException('"from" must be <= "to".');
     }
 
-    // 2) Buscar contrato
     const contract = await this.recurringContractRepo.findOne({
-      where: { id: contractId },
+      where: { id: contractId, userId: userId, status: ContractStatusEnum.Active },
+
     });
+    
     if (!contract) throw new NotFoundException('Contract not found.');
 
-    // (opcional) se tiver status “Active/Inactive”
-    // if (contract.status !== ContractStatusEnum.Active) ...
-
-    // 3) Gerar ocorrências fake no range
     const dueDates = generateDueDates(
       contract.firstDueDate,
       contract.interval,
@@ -155,7 +154,6 @@ export class ContractsService {
       source: 'GENERATED',
     }));
 
-    // 4) Buscar overrides persistidos no range
     const overridesModels = await this.recurringOccurrenceRepo.findAll({
       where: {
         contractId: contract.id,
@@ -167,11 +165,9 @@ export class ContractsService {
       order: [['dueDate', 'ASC']],
     });
 
-    // Sequelize Model[] -> plain objects
     const overrides = overridesModels.map((m) => m.get({ plain: true }));
 
-    // 5) Merge/projection (override ganha do generated)
-    const items = OccurrenceProjection.project(generated, overrides);
+    const items = OccurrenceProjection.project(generated, []);
 
     return {
       contractId: contract.id,
@@ -183,7 +179,6 @@ export class ContractsService {
     };
   }
   
-
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
     const totalCents = this.toCents(totalAmount);
     const per = Math.floor(totalCents / installmentsCount);
