@@ -15,8 +15,7 @@ import { formatIsoDateOnly } from 'src/common/utils/format-iso-date-only';
 import { Op } from 'sequelize';
 import { OccurrenceProjection } from './occurrence-projection';
 import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
-
-type GetOccurrencesQuery = { from: string; to: string };
+import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 
 @Injectable()
 export class ContractsService {
@@ -113,7 +112,7 @@ export class ContractsService {
 
   async getContractOccurrences(
     contractId: string,
-    query: GetOccurrencesQuery,
+    query: GetContractOccurrencesQueryDto,
     userId: string,
   ): Promise<{
     contractId: string;
@@ -121,16 +120,8 @@ export class ContractsService {
     items: ContractOccurrenceDto[];
   }> {
 
-    const fromDate = parseIsoDateOnly(query.from);
-    const toDate = parseIsoDateOnly(query.to);
-
-    if (!fromDate || !toDate) {
-      throw new BadRequestException('Invalid from/to. Use YYYY-MM-DD.');
-    }
-
-    if (fromDate > toDate) {
-      throw new BadRequestException('"from" must be <= "to".');
-    }
+    const fromDate = parseIsoDateOnly(query.from)!;
+    const toDate = parseIsoDateOnly(query.to)!;
 
     const contract = await this.recurringContractRepo.findOne({
       where: { id: contractId, userId: userId, status: ContractStatusEnum.Active },
@@ -151,7 +142,7 @@ export class ContractsService {
       amount: String(contract.amount),
       status: OccurrenceStatusEnum.Scheduled,
       transactionId: null,
-      source: 'GENERATED',
+      source: 'generated',
     }));
 
     const overridesModels = await this.recurringOccurrenceRepo.findAll({

@@ -1,6 +1,6 @@
-import { OccurrenceStatusEnum } from "../enums/installment-occurrence-status.enum";
+import { OccurrenceStatusEnum } from '../enums/installment-occurrence-status.enum';
 
-export type OccurrenceSource = 'GENERATED' | 'OVERRIDDEN';
+export type OccurrenceSource = 'generated' | 'override';
 
 export class ContractOccurrenceDto {
   dueDate: string;

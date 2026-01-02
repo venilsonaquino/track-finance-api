@@ -5,6 +5,7 @@ import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
+import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -24,10 +25,9 @@ export class ContractsController {
   @Get(':contractId/occurrences')
   async getOccurrences(
     @Param('contractId') contractId: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @CurrentUser() user: any
+    @Query() query: GetContractOccurrencesQueryDto,
+    @CurrentUser() user: any,
   ) {
-    return this.service.getContractOccurrences(contractId, { from, to }, user.id);
+    return this.service.getContractOccurrences(contractId, query, user.id);
   }
 }

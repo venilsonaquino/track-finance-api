@@ -27,7 +27,7 @@ export class OccurrenceProjection {
         amount: String(o.amount),
         status: o.status,
         transactionId: o.transactionId ?? null,
-        source: "OVERRIDDEN",
+        source: "override",
       });
     }
 
