@@ -5,7 +5,7 @@ import { InstallmentContractModel } from './models/installment-contract.model';
 import { InstallmentOccurrenceModel } from './models/installment-occurrence.model';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
 import { OccurrenceStatusEnum } from './enums/installment-occurrence-status.enum';
-import { generateDueDates } from 'src/common/utils/generate-due-dates';
+import { generateDueDatesByCount } from 'src/common/utils/generate-due-dates-by-count';
 import { ContractStatusEnum } from './enums/contract-status.enum';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 import { RecurringContractModel } from './models/recurring-contract.model';
@@ -16,6 +16,7 @@ import { Op } from 'sequelize';
 import { OccurrenceProjection } from './occurrence-projection';
 import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
+import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
 
 @Injectable()
 export class ContractsService {
@@ -60,7 +61,7 @@ export class ContractsService {
           dto.installmentsCount,
         );
 
-        const dueDates = generateDueDates(
+        const dueDates = generateDueDatesByCount(
           dto.firstDueDate,
           dto.installmentInterval,
           dto.installmentsCount,
@@ -130,7 +131,7 @@ export class ContractsService {
     
     if (!contract) throw new NotFoundException('Contract not found.');
 
-    const dueDates = generateDueDates(
+    const dueDates = generateDueDatesInRange(
       contract.firstDueDate,
       contract.interval,
       fromDate,
