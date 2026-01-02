@@ -6,6 +6,7 @@ import { ContractsService } from './contracts.service';
 import { ContractsController } from './contracts.controller';
 import { RecurringContractModel } from './models/recurring-contract.model';
 import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
+import { OccurrenceOverrideContractModel } from './models/override-occurrence-contract.model';
 
 @Module({
   imports: [
@@ -13,7 +14,8 @@ import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
       InstallmentContractModel,
       InstallmentOccurrenceModel,
       RecurringContractModel,
-      RecurringOccurrenceModel
+      RecurringOccurrenceModel,
+      OccurrenceOverrideContractModel
     ]),
   ],
   providers: [ContractsService],

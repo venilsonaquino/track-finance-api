@@ -15,15 +15,22 @@ import { RecurringContractModel } from './recurring-contract.model';
 @Table({
   tableName: 'override_occurrence_contracts',
   timestamps: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['contract_id', 'due_date'],
+    },
+  ],
 })
 export class OccurrenceOverrideContractModel extends Model<OccurrenceOverrideContractModel> {
   
   @PrimaryKey
-  @Default(ulid)
-  @Column(DataType.STRING(26))
+  @Column({
+    type: DataType.STRING(26),
+    defaultValue: ulid,
+  })
   id: string;
 
-  @Index('ux_contract_due_date')
   @ForeignKey(() => RecurringContractModel)
   @Column({
     type: DataType.STRING(26),
@@ -31,12 +38,11 @@ export class OccurrenceOverrideContractModel extends Model<OccurrenceOverrideCon
   })
   contractId: string;
 
-  @Index('ux_contract_due_date')
   @Column({
     type: DataType.DATEONLY,
     allowNull: false,
   })
-  dueDate: string; // YYYY-MM-DD
+  dueDate: string; 
 
   @Column({
     type: DataType.DECIMAL(14, 2),
