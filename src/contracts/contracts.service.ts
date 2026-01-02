@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
@@ -17,6 +17,7 @@ import { OccurrenceProjection } from './occurrence-projection';
 import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
+import { GetContractOccurrencesResponseDto } from './dtos/get-contract-occurrences-response.dto';
 
 @Injectable()
 export class ContractsService {
@@ -115,11 +116,7 @@ export class ContractsService {
     contractId: string,
     query: GetContractOccurrencesQueryDto,
     userId: string,
-  ): Promise<{
-    contractId: string;
-    period: { from: string; to: string };
-    items: ContractOccurrenceDto[];
-  }> {
+  ): Promise<GetContractOccurrencesResponseDto> {
 
     const fromDate = parseIsoDateOnly(query.from)!;
     const toDate = parseIsoDateOnly(query.to)!;

@@ -1,4 +1,3 @@
-// src/installments/controllers/installment-contracts.controller.ts
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
 import { ContractsService } from './contracts.service';
