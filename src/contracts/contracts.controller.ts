@@ -1,5 +1,5 @@
 // src/installments/controllers/installment-contracts.controller.ts
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
 import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
@@ -19,5 +19,14 @@ export class ContractsController {
   @Post('recurring')
   async createRecurring(@Body() dto: CreateRecurringContractDto, @CurrentUser() user: any) {
     return this.service.createRecurringContract(user.id, dto);
+  }
+
+  @Get(':contractId/occurrences')
+  async getOccurrences(
+    @Param('contractId') contractId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.service.getContractOccurrences(contractId, { from, to });
   }
 }

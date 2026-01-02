@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
@@ -10,7 +10,13 @@ import { ContractStatusEnum } from './enums/contract-status.enum';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 import { RecurringContractModel } from './models/recurring-contract.model';
 import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
+import { parseIsoDateOnly } from 'src/common/utils/parse-iso-date-only';
+import { formatIsoDateOnly } from 'src/common/utils/format-iso-date-only';
+import { Op } from 'sequelize';
+import { OccurrenceProjection } from './occurrence-projection';
+import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
 
+type GetOccurrencesQuery = { from: string; to: string };
 
 @Injectable()
 export class ContractsService {
@@ -26,6 +32,7 @@ export class ContractsService {
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
   ) {}
+  
 
   async createInstallmentContract(dto: CreateInstallmentContractDto, userId: string) {
     const generateOccurrences = dto.generateOccurrences ?? true;
@@ -84,8 +91,6 @@ export class ContractsService {
     userId: string,
     dto: CreateRecurringContractDto,
   ) {
-    const generateAheadCount = dto.generateAheadCount ?? 12;
-
     return this.sequelize.transaction(async (transaction) => {
       const contract = await this.recurringContractRepo.create(
         {
@@ -101,34 +106,85 @@ export class ContractsService {
         { transaction },
       );
 
-      const dueDates = generateDueDates(
-        dto.firstDueDate,
-        dto.interval,
-        generateAheadCount,
-      );
+      return { contract };
 
-      const occurrences = await this.recurringOccurrenceRepo.bulkCreate(
-        dueDates.map((dueDate) => ({
-          contractId: contract.id,
-          dueDate,
-          amount: dto.amount,
-          status: OccurrenceStatusEnum.Scheduled,
-          transactionId: null,
-        })),
-        { transaction, returning: true },
-      );
-
-      return {
-        contract,
-        occurrences,
-      };
     });
   }
 
+  async getContractOccurrences(
+    contractId: string,
+    query: GetOccurrencesQuery,
+  ): Promise<{
+    contractId: string;
+    period: { from: string; to: string };
+    items: ContractOccurrenceDto[];
+  }> {
+    // 1) Validar query
+    const fromDate = parseIsoDateOnly(query.from);
+    const toDate = parseIsoDateOnly(query.to);
+
+    if (!fromDate || !toDate) {
+      throw new BadRequestException('Invalid from/to. Use YYYY-MM-DD.');
+    }
+    if (fromDate > toDate) {
+      throw new BadRequestException('"from" must be <= "to".');
+    }
+
+    // 2) Buscar contrato
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId },
+    });
+    if (!contract) throw new NotFoundException('Contract not found.');
+
+    // (opcional) se tiver status “Active/Inactive”
+    // if (contract.status !== ContractStatusEnum.Active) ...
+
+    // 3) Gerar ocorrências fake no range
+    const dueDates = generateDueDates(
+      contract.firstDueDate,
+      contract.interval,
+      fromDate,
+      toDate,
+    );
+
+    const generated: ContractOccurrenceDto[] = dueDates.map((dueDate) => ({
+      dueDate,
+      amount: String(contract.amount),
+      status: OccurrenceStatusEnum.Scheduled,
+      transactionId: null,
+      source: 'GENERATED',
+    }));
+
+    // 4) Buscar overrides persistidos no range
+    const overridesModels = await this.recurringOccurrenceRepo.findAll({
+      where: {
+        contractId: contract.id,
+        dueDate: {
+          [Op.gte]: formatIsoDateOnly(fromDate),
+          [Op.lte]: formatIsoDateOnly(toDate),
+        },
+      },
+      order: [['dueDate', 'ASC']],
+    });
+
+    // Sequelize Model[] -> plain objects
+    const overrides = overridesModels.map((m) => m.get({ plain: true }));
+
+    // 5) Merge/projection (override ganha do generated)
+    const items = OccurrenceProjection.project(generated, overrides);
+
+    return {
+      contractId: contract.id,
+      period: {
+        from: query.from,
+        to: query.to,
+      },
+      items,
+    };
+  }
+  
 
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
-    // estratégia simples: divide e arredonda 2 casas.
-    // Obs: em produção, o ideal é distribuir os centavos na última parcela (ou primeiras).
     const totalCents = this.toCents(totalAmount);
     const per = Math.floor(totalCents / installmentsCount);
     return this.fromCents(per);
