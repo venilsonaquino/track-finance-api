@@ -15,7 +15,6 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { TransactionMapper } from './mappers/transaction.mapper';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { TransactionStatus } from './enums/transaction-status.enum';
-import { TransactionType } from './enums/transaction-type.enum';
 
 @Injectable()
 export class TransactionsService {
@@ -108,7 +107,6 @@ export class TransactionsService {
           bankId: dto.bankId,
           bankName: dto.bankName,
           currency: dto.currency,
-          // transactionDate: dto.transactionDate,
         });
 
         return transaction;

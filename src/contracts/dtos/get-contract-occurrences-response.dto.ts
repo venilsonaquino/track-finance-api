@@ -1,4 +1,4 @@
-import { ContractOccurrenceDto } from "./contract-occorence.dto";
+import { ContractOccurrenceDto } from './contract-occorence.dto';
 
 export class GetContractOccurrencesResponseDto {
   contractId: string;

@@ -1,5 +1,8 @@
-import { ContractOccurrenceDto, OccurrenceSource } from "./dtos/contract-occorence.dto";
-import { OccurrenceStatusEnum } from "./enums/installment-occurrence-status.enum";
+import {
+  ContractOccurrenceDto,
+  OccurrenceSource,
+} from './dtos/contract-occorence.dto';
+import { OccurrenceStatusEnum } from './enums/installment-occurrence-status.enum';
 
 type PersistedOverride = {
   dueDate: string | Date;
@@ -27,7 +30,7 @@ export class OccurrenceProjection {
         amount: String(o.amount),
         status: o.status,
         transactionId: o.transactionId ?? null,
-        source: "OVERRIDE" as OccurrenceSource,
+        source: 'OVERRIDE' as OccurrenceSource,
       });
     }
 
@@ -38,13 +41,14 @@ export class OccurrenceProjection {
 }
 
 function normalizeDateOnly(value: string | Date): string {
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+    return value;
 
-  const d = typeof value === "string" ? new Date(value) : value;
+  const d = typeof value === 'string' ? new Date(value) : value;
 
   // date-only em UTC pra evitar bug de timezone
   const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }

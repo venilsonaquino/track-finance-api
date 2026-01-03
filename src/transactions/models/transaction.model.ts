@@ -49,7 +49,6 @@ export class TransactionModel extends Model<TransactionModel> {
   })
   amount: string;
 
-
   @Column({
     field: 'transaction_type',
     type: DataType.ENUM,
@@ -154,7 +153,9 @@ export class TransactionModel extends Model<TransactionModel> {
   @BelongsTo(() => WalletModel)
   wallet: WalletEntity;
 
-  @HasOne(() => InstallmentOccurrenceModel, { foreignKey: 'transactionId', as: 'installmentOccurrence' })
+  @HasOne(() => InstallmentOccurrenceModel, {
+    foreignKey: 'transactionId',
+    as: 'installmentOccurrence',
+  })
   installmentOccurrence?: InstallmentOccurrenceModel;
 }
-  

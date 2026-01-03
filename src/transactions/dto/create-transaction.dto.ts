@@ -5,7 +5,6 @@ import {
   IsNumber,
   IsOptional,
   IsEnum,
-  ValidateIf,
   ValidateNested,
   IsBoolean,
   IsDateString,
@@ -16,7 +15,6 @@ import { TransactionType } from '../enums/transaction-type.enum';
 import { InstallmentInfoDto } from 'src/contracts/dtos/installment-info.dto';
 
 export class CreateTransactionDto {
-
   @IsNotEmpty()
   @IsEnum(['single', 'installment'])
   mode: 'single' | 'installment';
@@ -68,8 +66,6 @@ export class CreateTransactionDto {
   @ValidateNested()
   @Type(() => InstallmentInfoDto)
   installment: InstallmentInfoDto;
-
-
 
   /* METADADOS BANCÁRIOS */
   @IsNotEmpty()

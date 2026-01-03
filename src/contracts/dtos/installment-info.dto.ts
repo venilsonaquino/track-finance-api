@@ -1,9 +1,4 @@
-import {
-  IsNotEmpty,
-  IsDateString,
-  IsEnum,
-  IsNumber,
-} from 'class-validator';
+import { IsNotEmpty, IsDateString, IsEnum, IsNumber } from 'class-validator';
 import { IntervalEnum } from '../enums/interval.enum';
 
 export class InstallmentInfoDto {

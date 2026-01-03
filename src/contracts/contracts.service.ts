@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { InstallmentContractModel } from './models/installment-contract.model';
@@ -14,7 +18,10 @@ import { parseIsoDateOnly } from 'src/common/utils/parse-iso-date-only';
 import { formatIsoDateOnly } from 'src/common/utils/format-iso-date-only';
 import { Op } from 'sequelize';
 import { OccurrenceProjection } from './occurrence-projection';
-import { ContractOccurrenceDto, OccurrenceSource } from './dtos/contract-occorence.dto';
+import {
+  ContractOccurrenceDto,
+  OccurrenceSource,
+} from './dtos/contract-occorence.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
 import { GetContractOccurrencesResponseDto } from './dtos/get-contract-occurrences-response.dto';
@@ -34,9 +41,11 @@ export class ContractsService {
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
   ) {}
-  
 
-  async createInstallmentContract(dto: CreateInstallmentContractDto, userId: string) {
+  async createInstallmentContract(
+    dto: CreateInstallmentContractDto,
+    userId: string,
+  ) {
     const generateOccurrences = dto.generateOccurrences ?? true;
 
     return this.sequelize.transaction(async (t) => {
@@ -109,7 +118,6 @@ export class ContractsService {
       );
 
       return { contract };
-
     });
   }
 
@@ -118,15 +126,17 @@ export class ContractsService {
     query: GetContractOccurrencesQueryDto,
     userId: string,
   ): Promise<GetContractOccurrencesResponseDto> {
-
     const fromDate = parseIsoDateOnly(query.from)!;
     const toDate = parseIsoDateOnly(query.to)!;
 
     const contract = await this.recurringContractRepo.findOne({
-      where: { id: contractId, userId: userId, status: ContractStatusEnum.Active },
-
+      where: {
+        id: contractId,
+        userId: userId,
+        status: ContractStatusEnum.Active,
+      },
     });
-    
+
     if (!contract) throw new NotFoundException('Contract not found.');
 
     const dueDates = generateDueDatesInRange(
@@ -177,8 +187,7 @@ export class ContractsService {
   ): Promise<{
     contractId: string;
     occurrence: ContractOccurrenceDto;
-  }> 
-  {
+  }> {
     // 1) valida dueDate (YYYY-MM-DD)
     const dueDateObj = parseIsoDateOnly(dueDate);
     if (!dueDateObj) {
@@ -193,8 +202,12 @@ export class ContractsService {
 
     // 3) valida se dueDate cai na “grade” do contrato
     // (pra não permitir override em uma data que nunca existiria)
-    if (!isDueDateOnSchedule(contract.firstDueDate, contract.interval, dueDate)) {
-      throw new BadRequestException('dueDate is not valid for this contract schedule.');
+    if (
+      !isDueDateOnSchedule(contract.firstDueDate, contract.interval, dueDate)
+    ) {
+      throw new BadRequestException(
+        'dueDate is not valid for this contract schedule.',
+      );
     }
 
     // 4) monta o override final (defaults)
@@ -207,8 +220,13 @@ export class ContractsService {
     };
 
     // regra mínima: se status = POSTED, geralmente exige transactionId
-    if (overrideToSave.status === OccurrenceStatusEnum.Posted && !overrideToSave.transactionId) {
-      throw new BadRequestException('transactionId is required when status is POSTED.');
+    if (
+      overrideToSave.status === OccurrenceStatusEnum.Posted &&
+      !overrideToSave.transactionId
+    ) {
+      throw new BadRequestException(
+        'transactionId is required when status is POSTED.',
+      );
     }
 
     // 5) upsert (ideal) - depende do seu repo/model suportar
@@ -228,7 +246,9 @@ export class ContractsService {
         return existing;
       }
 
-      return await this.recurringOccurrenceRepo.create(overrideToSave, { transaction });
+      return await this.recurringOccurrenceRepo.create(overrideToSave, {
+        transaction,
+      });
     });
 
     const plain = saved.get ? saved.get({ plain: true }) : saved;
@@ -253,8 +273,10 @@ export class ContractsService {
     return contract;
   }
 
-
-  private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
+  private calculateInstallmentAmount(
+    totalAmount: string,
+    installmentsCount: number,
+  ): string {
     const totalCents = this.toCents(totalAmount);
     const per = Math.floor(totalCents / installmentsCount);
     return this.fromCents(per);

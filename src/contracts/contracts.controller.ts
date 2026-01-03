@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
 import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
@@ -13,12 +22,18 @@ export class ContractsController {
   constructor(private readonly service: ContractsService) {}
 
   @Post('installments')
-  async create(@Body() dto: CreateInstallmentContractDto, @CurrentUser() user: any) {
+  async create(
+    @Body() dto: CreateInstallmentContractDto,
+    @CurrentUser() user: any,
+  ) {
     return this.service.createInstallmentContract(dto, user.id);
   }
 
   @Post('recurring')
-  async createRecurring(@Body() dto: CreateRecurringContractDto, @CurrentUser() user: any) {
+  async createRecurring(
+    @Body() dto: CreateRecurringContractDto,
+    @CurrentUser() user: any,
+  ) {
     return this.service.createRecurringContract(user.id, dto);
   }
 
@@ -38,11 +53,19 @@ export class ContractsController {
     @Body() dto: UpsertOccurrenceOverrideDto,
     @CurrentUser() user: any,
   ) {
-    return this.service.upsertOccurrenceOverride(contractId, dueDate, dto,user.id);
+    return this.service.upsertOccurrenceOverride(
+      contractId,
+      dueDate,
+      dto,
+      user.id,
+    );
   }
 
   @Get(':contractId')
-  async getContractById(@Param('contractId') contractId: string, @CurrentUser() user: any) {
+  async getContractById(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.service.getContractById(contractId, user.id);
   }
 }

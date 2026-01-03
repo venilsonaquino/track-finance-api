@@ -78,7 +78,6 @@ export class WalletsService {
     updateWalletDto: UpdateWalletDto,
     userId: string,
   ): Promise<WalletResponseDto> {
-
     this.logger.log(
       `Updating wallet id=${id} user=${userId} name=${updateWalletDto.name} balance=${updateWalletDto.balance}`,
       WalletsService.name,

@@ -1,4 +1,4 @@
-import { OccurrenceStatusEnum } from "../enums/installment-occurrence-status.enum";
+import { OccurrenceStatusEnum } from '../enums/installment-occurrence-status.enum';
 
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
@@ -15,5 +15,3 @@ export class UpsertOccurrenceOverrideDto {
   @IsString()
   transactionId?: string | null;
 }
-
-

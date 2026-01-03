@@ -1,7 +1,11 @@
 import { IntervalEnum } from 'src/contracts/enums/interval.enum';
 import { parseIsoDateOnly } from './parse-iso-date-only';
 
-export function isDueDateOnSchedule(firstDueDate: string, interval: IntervalEnum, dueDate: string): boolean {
+export function isDueDateOnSchedule(
+  firstDueDate: string,
+  interval: IntervalEnum,
+  dueDate: string,
+): boolean {
   const first = parseIsoDateOnly(firstDueDate);
   const target = parseIsoDateOnly(dueDate);
   if (!first || !target) return false;
@@ -9,7 +13,9 @@ export function isDueDateOnSchedule(firstDueDate: string, interval: IntervalEnum
   // não faz sentido sobrescrever antes do contrato começar
   if (target.getTime() < first.getTime()) return false;
 
-  const daysDiff = Math.floor((target.getTime() - first.getTime()) / (24 * 60 * 60 * 1000));
+  const daysDiff = Math.floor(
+    (target.getTime() - first.getTime()) / (24 * 60 * 60 * 1000),
+  );
 
   switch (interval) {
     case IntervalEnum.Daily:

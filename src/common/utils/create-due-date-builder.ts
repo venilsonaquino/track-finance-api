@@ -1,6 +1,9 @@
 import { IntervalEnum } from 'src/contracts/enums/interval.enum';
 
-export function createDueDateBuilder(firstDueDate: string, interval: IntervalEnum) {
+export function createDueDateBuilder(
+  firstDueDate: string,
+  interval: IntervalEnum,
+) {
   const [y, m, d] = firstDueDate.split('-').map(Number);
 
   // Use UTC dates to avoid timezone drift from the host environment.

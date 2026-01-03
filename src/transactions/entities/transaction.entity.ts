@@ -69,7 +69,9 @@ export class TransactionEntity {
 
   public static calculateIncome(transactions: TransactionEntity[]): number {
     return transactions
-      .filter((t) => t.amount > 0 && t.transactionType === TransactionType.Income)
+      .filter(
+        (t) => t.amount > 0 && t.transactionType === TransactionType.Income,
+      )
       .reduce((sum, t) => sum + t.amount, 0);
   }
 
