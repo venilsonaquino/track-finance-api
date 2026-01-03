@@ -1,4 +1,4 @@
-import { ContractOccurrenceDto } from "./dtos/contract-occorence.dto";
+import { ContractOccurrenceDto, OccurrenceSource } from "./dtos/contract-occorence.dto";
 import { OccurrenceStatusEnum } from "./enums/installment-occurrence-status.enum";
 
 type PersistedOverride = {
@@ -27,7 +27,7 @@ export class OccurrenceProjection {
         amount: String(o.amount),
         status: o.status,
         transactionId: o.transactionId ?? null,
-        source: "override",
+        source: "OVERRIDE" as OccurrenceSource,
       });
     }
 
