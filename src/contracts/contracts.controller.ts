@@ -40,4 +40,9 @@ export class ContractsController {
   ) {
     return this.service.upsertOccurrenceOverride(contractId, dueDate, dto,user.id);
   }
+
+  @Get(':contractId')
+  async getContractById(@Param('contractId') contractId: string, @CurrentUser() user: any) {
+    return this.service.getContractById(contractId, user.id);
+  }
 }

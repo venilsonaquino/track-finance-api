@@ -245,6 +245,14 @@ export class ContractsService {
     };
   }
 
+  async getContractById(contractId: string, userId: string) {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) throw new NotFoundException('Contract not found.');
+    return contract;
+  }
+
 
   private calculateInstallmentAmount(totalAmount: string, installmentsCount: number): string {
     const totalCents = this.toCents(totalAmount);
