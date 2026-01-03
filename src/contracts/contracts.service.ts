@@ -14,7 +14,7 @@ import { parseIsoDateOnly } from 'src/common/utils/parse-iso-date-only';
 import { formatIsoDateOnly } from 'src/common/utils/format-iso-date-only';
 import { Op } from 'sequelize';
 import { OccurrenceProjection } from './occurrence-projection';
-import { ContractOccurrenceDto } from './dtos/contract-occorence.dto';
+import { ContractOccurrenceDto, OccurrenceSource } from './dtos/contract-occorence.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
 import { GetContractOccurrencesResponseDto } from './dtos/get-contract-occurrences-response.dto';
@@ -141,7 +141,7 @@ export class ContractsService {
       amount: String(contract.amount),
       status: OccurrenceStatusEnum.Scheduled,
       transactionId: null,
-      source: 'GENERATED',
+      source: 'GENERATED' as OccurrenceSource,
     }));
 
     const overridesModels = await this.recurringOccurrenceRepo.findAll({
@@ -156,8 +156,6 @@ export class ContractsService {
     });
 
     const overrides = overridesModels.map((m) => m.get({ plain: true }));
-
-    console.log('overrides', overrides);
 
     const items = OccurrenceProjection.project(generated, overrides);
 
@@ -242,7 +240,7 @@ export class ContractsService {
         amount: String(plain.amount),
         status: plain.status,
         transactionId: plain.transactionId ?? null,
-        source: 'OVERRIDE',
+        source: 'OVERRIDE' as OccurrenceSource,
       },
     };
   }
