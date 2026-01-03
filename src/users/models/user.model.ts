@@ -15,7 +15,7 @@ import { ulid } from 'ulid';
 export class UserModel extends Model<UserModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;

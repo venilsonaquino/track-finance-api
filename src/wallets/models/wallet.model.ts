@@ -20,7 +20,7 @@ import { ulid } from 'ulid';
 export class WalletModel extends Model<WalletModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;

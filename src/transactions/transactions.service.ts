@@ -12,6 +12,9 @@ import { Op } from 'sequelize';
 import { DateRangeDto } from './dto/date-range.dto';
 import { groupTransactionsAsArray } from 'src/common/utils/group-transaction-by-date';
 import { WalletFacade } from 'src/wallets/facades/wallet.facade';
+import { TransactionMapper } from './mappers/transaction.mapper';
+import { LoggerService } from 'src/config/logging/logger.service';
+import { TransactionStatus } from './enums/transaction-status.enum';
 
 @Injectable()
 export class TransactionsService {
@@ -19,49 +22,16 @@ export class TransactionsService {
     @InjectModel(TransactionModel)
     private readonly transactionalModel: typeof TransactionModel,
     private readonly walletFacade: WalletFacade,
+    private readonly logger: LoggerService,
   ) {}
-
-  private mapToEntity(model: TransactionModel): TransactionEntity {
-    const entity = new TransactionEntity({
-      id: model.id,
-      depositedDate: model.depositedDate,
-      description: model.description,
-      amount: model.amount,
-      userId: model.userId,
-      categoryId: model.categoryId,
-      walletId: model.walletId,
-      isRecurring: model.isRecurring,
-      fitId: model.fitId,
-      isInstallment: model.isInstallment,
-      installmentInterval: model.installmentInterval as
-        | 'DAILY'
-        | 'MONTHLY'
-        | 'WEEKLY'
-        | 'YEARLY',
-      installmentNumber: model.installmentNumber,
-      installmentEndDate: model.installmentEndDate,
-      transactionDate: model.transactionDate,
-      transactionType: model.transactionType,
-      accountId: model.accountId,
-      accountType: model.accountType,
-      bankId: model.bankId,
-      bankName: model.bankName,
-      currency: model.currency,
-    });
-
-    if (model.category) {
-      entity.category = model.category;
-    }
-
-    if (model.wallet) {
-      entity.wallet = model.wallet;
-    }
-
-    return entity;
-  }
 
   async create(createTransactionDto: CreateTransactionDto, userId: string) {
     try {
+      this.logger.log(
+        `Creating transaction for user=${userId} wallet=${createTransactionDto.walletId} amount=${createTransactionDto.amount} affectBalance=${createTransactionDto.affectBalance}`,
+        TransactionsService.name,
+      );
+
       const transaction = new TransactionEntity({
         depositedDate: createTransactionDto.depositedDate,
         description: createTransactionDto.description,
@@ -70,20 +40,40 @@ export class TransactionsService {
         categoryId: createTransactionDto.categoryId,
         fitId: createTransactionDto.fitId,
         walletId: createTransactionDto.walletId,
-        isRecurring: createTransactionDto.isRecurring,
-        isInstallment: createTransactionDto.isInstallment,
-        installmentNumber: createTransactionDto.installmentNumber,
-        installmentInterval: createTransactionDto.installmentInterval,
+        transactionType: createTransactionDto.transactionType,
+        transactionStatus:
+          createTransactionDto.transactionStatus ?? TransactionStatus.Posted,
         accountId: createTransactionDto.accountId,
         accountType: createTransactionDto.accountType,
         bankId: createTransactionDto.bankId,
         bankName: createTransactionDto.bankName,
         currency: createTransactionDto.currency,
-        transactionDate: createTransactionDto.transactionDate,
-        transactionType: createTransactionDto.transactionType,
+        // transactionDate: createTransactionDto.transactionDate,
       });
 
-      return await this.transactionalModel.create(transaction);
+      const createdTransaction = await this.transactionalModel.create(
+        transaction as any,
+      );
+
+      if (createTransactionDto.affectBalance) {
+        this.logger.log(
+          `Affecting balance for wallet=${createTransactionDto.walletId} after transaction=${createdTransaction.id}`,
+          TransactionsService.name,
+        );
+
+        const delta = TransactionEntity.resolveBalanceDelta(
+          +createTransactionDto.amount,
+          createTransactionDto.transactionType,
+        );
+
+        await this.walletFacade.adjustWalletBalance(
+          createTransactionDto.walletId,
+          userId,
+          delta,
+        );
+      }
+
+      return createdTransaction;
     } catch (error) {
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
@@ -96,31 +86,59 @@ export class TransactionsService {
     userId: string,
   ) {
     try {
-      const transactions = createTransactionDtos.map(
-        (dto) =>
-          new TransactionEntity({
-            depositedDate: dto.depositedDate,
-            description: dto.description,
-            amount: +dto.amount,
-            userId: userId,
-            categoryId: dto.categoryId,
-            fitId: dto.fitId,
-            walletId: dto.walletId,
-            isRecurring: dto.isRecurring,
-            isInstallment: dto.isInstallment,
-            installmentNumber: dto.installmentNumber,
-            installmentInterval: dto.installmentInterval,
-            accountId: dto.accountId,
-            accountType: dto.accountType,
-            bankId: dto.bankId,
-            bankName: dto.bankName,
-            currency: dto.currency,
-            transactionDate: dto.transactionDate,
-            transactionType: dto.transactionType,
-          }),
+      this.logger.log(
+        `Creating batch of ${createTransactionDtos.length} transactions for user=${userId}`,
+        TransactionsService.name,
       );
 
-      return await this.transactionalModel.bulkCreate(transactions);
+      const transactions = createTransactionDtos.map((dto) => {
+        const transaction = new TransactionEntity({
+          depositedDate: dto.depositedDate,
+          description: dto.description,
+          amount: +dto.amount,
+          userId: userId,
+          categoryId: dto.categoryId,
+          fitId: dto.fitId,
+          walletId: dto.walletId,
+          transactionType: dto.transactionType,
+          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
+          accountId: dto.accountId,
+          accountType: dto.accountType,
+          bankId: dto.bankId,
+          bankName: dto.bankName,
+          currency: dto.currency,
+        });
+
+        return transaction;
+      });
+
+      const createdTransactions = await this.transactionalModel.bulkCreate(
+        transactions as any,
+      );
+
+      for (const dto of createTransactionDtos) {
+        if (!dto.affectBalance) {
+          continue;
+        }
+
+        this.logger.log(
+          `Affecting balance (batch) for wallet=${dto.walletId} amount=${dto.amount} transactionType=${dto.transactionType}`,
+          TransactionsService.name,
+        );
+
+        const delta = TransactionEntity.resolveBalanceDelta(
+          +dto.amount,
+          dto.transactionType,
+        );
+
+        await this.walletFacade.adjustWalletBalance(
+          dto.walletId,
+          userId,
+          delta,
+        );
+      }
+
+      return createdTransactions;
     } catch (error) {
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
@@ -162,7 +180,9 @@ export class TransactionsService {
     });
 
     const balance = await this.walletFacade.getWalletBalance(userId);
-    const transactionEntities = transactions.map((t) => this.mapToEntity(t));
+    const transactionEntities = transactions.map((t) =>
+      TransactionMapper.toEntity(t),
+    );
     const income = TransactionEntity.calculateIncome(transactionEntities);
     const expense = TransactionEntity.calculateExpense(transactionEntities);
     const monthly_balance = TransactionEntity.calculateMonthlyBalance(
@@ -204,15 +224,22 @@ export class TransactionsService {
       depositedDate: updateTransactionDto.depositedDate,
       description: updateTransactionDto.description,
       amount: +updateTransactionDto.amount,
-      isRecurring: updateTransactionDto.isRecurring,
       userId: userId,
       categoryId: updateTransactionDto.categoryId,
       fitId: updateTransactionDto.fitId,
       walletId: updateTransactionDto.walletId,
+      transactionType: updateTransactionDto.transactionType,
+      transactionStatus: updateTransactionDto.transactionStatus,
+      accountId: updateTransactionDto.accountId,
+      accountType: updateTransactionDto.accountType,
+      bankId: updateTransactionDto.bankId,
+      bankName: updateTransactionDto.bankName,
+      currency: updateTransactionDto.currency,
+      // transactionDate: updateTransactionDto.transactionDate,
     });
 
     const [affectedCount, updated] = await this.transactionalModel.update(
-      transaction,
+      transaction as any,
       {
         where: { id, userId },
         returning: true,
@@ -253,7 +280,7 @@ export class TransactionsService {
     });
 
     const transactionEntities = transactions.map((transaction) =>
-      this.mapToEntity(transaction),
+      TransactionMapper.toEntity(transaction),
     );
     return transactionEntities;
   }
@@ -272,7 +299,9 @@ export class TransactionsService {
         include: ['category', 'wallet'],
       });
 
-      const transactions = transactionsModel.map((t) => this.mapToEntity(t));
+      const transactions = transactionsModel.map((t) =>
+        TransactionMapper.toEntity(t),
+      );
 
       return transactions;
     } catch (error) {

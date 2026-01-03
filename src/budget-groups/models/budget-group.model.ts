@@ -16,7 +16,7 @@ import { BudgetGroupKind } from '../enum/BudgetGroupKind';
 export class BudgetGroupModel extends Model<BudgetGroupModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;
@@ -64,7 +64,7 @@ export class BudgetGroupModel extends Model<BudgetGroupModel> {
 
   @Column({
     field: 'user_id',
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     allowNull: true,
   })
   userId: string;

@@ -11,7 +11,7 @@ export class SendEmailWelcomeListener {
     @Inject(LoggerService)
     private readonly logger: LoggerService,
   ) {}
-  
+
   @OnEvent('user.created')
   async handleUserCreatedEvent(event: UserCreatedEvent) {
     this.mailService
