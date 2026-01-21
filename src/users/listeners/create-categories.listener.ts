@@ -198,6 +198,59 @@ export class CreateCategoriesListener {
       }
     }
 
+    const budgetGroups = await this.budgetGroupFacade.findAllByUser(
+      event.userId,
+    );
+    const categories = await this.categoryFacade.findAllByUser(event.userId);
+
+    const groupAssignments: Record<string, string[]> = {
+      'GASTOS ESSENCIAIS': [
+        'Alimentação',
+        'Casa',
+        'Energia',
+        'Internet',
+        'Supermercado',
+        'Transporte',
+        'Saúde',
+        'Educação',
+      ],
+      'OUTROS GASTOS': [
+        'Compras',
+        'Lazer',
+        'Jogos',
+        'Eletrônicos',
+        'Vestuário',
+        'Viagem',
+        'Presentes',
+        'Serviços',
+        'Assinatura',
+        'Operação bancária',
+        'Pix',
+      ],
+    };
+
+    const assignments = Object.entries(groupAssignments).flatMap(
+      ([groupTitle, categoryNames]) => {
+        const group = budgetGroups.find((g) => g.title === groupTitle);
+        if (!group) return [];
+        return categoryNames
+          .map((name) => categories.find((c) => c.name === name))
+          .filter(Boolean)
+          .map((category) => ({
+            categoryId: category!.id,
+            budgetGroupId: group.id,
+          }));
+      },
+    );
+
+    if (assignments.length > 0) {
+      const syncDto: SyncCategoryAssignmentsDto = { assignments };
+      await this.budgetGroupFacade.syncCategoryAssignments(
+        syncDto,
+        event.userId,
+      );
+    }
+
     this.logger.log(
       `Default budget categories created for user ${event.userId}`,
       'CreateCategoriesListener',

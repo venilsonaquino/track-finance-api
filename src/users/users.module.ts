@@ -11,6 +11,7 @@ import { CreateWalletListener } from './listeners/create-wallet.listener';
 import { MailModule } from 'src/shared/mail/mail.module';
 import { LoggerModule } from '../config/logging/logger.module';
 import { BudgetGroupsModule } from 'src/budget-groups/budget-groups.module';
+import { CreateGroupListener } from './listeners/create-group.listener';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BudgetGroupsModule } from 'src/budget-groups/budget-groups.module';
     CreateCategoriesListener,
     CreateWalletListener,
     CreateBudgetGroupsListener,
+    CreateGroupListener,
   ],
   exports: [UsersService],
 })
