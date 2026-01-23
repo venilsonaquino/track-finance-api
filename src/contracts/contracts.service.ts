@@ -27,6 +27,8 @@ import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-
 import { GetContractOccurrencesResponseDto } from './dtos/get-contract-occurrences-response.dto';
 import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
 import { isDueDateOnSchedule } from 'src/common/utils/is-due-date-on-schedule';
+import { WalletModel } from 'src/wallets/models/wallet.model';
+import { CategoryModel } from 'src/categories/models/category.model';
 
 @Injectable()
 export class ContractsService {
@@ -40,6 +42,10 @@ export class ContractsService {
     private readonly recurringContractRepo: typeof RecurringContractModel,
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
+    @InjectModel(WalletModel)
+    private readonly walletRepo: typeof WalletModel,
+    @InjectModel(CategoryModel)
+    private readonly categoryRepo: typeof CategoryModel,
   ) {}
 
   async createInstallmentContract(
@@ -47,6 +53,20 @@ export class ContractsService {
     userId: string,
   ) {
     const generateOccurrences = dto.generateOccurrences ?? true;
+
+    const wallet = await this.walletRepo.findOne({
+      where: { id: dto.walletId, userId },
+    });
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found for user.');
+    }
+
+    const category = await this.categoryRepo.findOne({
+      where: { id: dto.categoryId, userId },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found for user.');
+    }
 
     return this.sequelize.transaction(async (t) => {
       const contract = await this.contractRepo.create(
@@ -102,6 +122,13 @@ export class ContractsService {
     userId: string,
     dto: CreateRecurringContractDto,
   ) {
+    const wallet = await this.walletRepo.findOne({
+      where: { id: dto.walletId, userId },
+    });
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found for user.');
+    }
+
     return this.sequelize.transaction(async (transaction) => {
       const contract = await this.recurringContractRepo.create(
         {
@@ -110,7 +137,7 @@ export class ContractsService {
           categoryId: dto.categoryId,
           description: dto.description,
           amount: dto.amount,
-          interval: dto.interval,
+          installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
           status: ContractStatusEnum.Active,
         },
@@ -141,7 +168,7 @@ export class ContractsService {
 
     const dueDates = generateDueDatesInRange(
       contract.firstDueDate,
-      contract.interval,
+      contract.installmentInterval,
       fromDate,
       toDate,
     );
@@ -203,7 +230,7 @@ export class ContractsService {
     // 3) valida se dueDate cai na “grade” do contrato
     // (pra não permitir override em uma data que nunca existiria)
     if (
-      !isDueDateOnSchedule(contract.firstDueDate, contract.interval, dueDate)
+      !isDueDateOnSchedule(contract.firstDueDate, contract.installmentInterval, dueDate)
     ) {
       throw new BadRequestException(
         'dueDate is not valid for this contract schedule.',
