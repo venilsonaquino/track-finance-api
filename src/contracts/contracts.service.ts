@@ -337,8 +337,9 @@ export class ContractsService {
     const amount = String(occurrence.amount);
     const description =
       dto.description ??
-      contract.description ??
-      `Parcela ${installmentIndex}/${contract.installmentsCount}`;
+      (contract.description
+        ? `${contract.description} • Parcela ${installmentIndex}/${contract.installmentsCount}`
+        : `Parcela ${installmentIndex}/${contract.installmentsCount}`);
     const depositedDate = dto.depositedDate ?? occurrence.dueDate;
     const transactionStatus =
       dto.transactionStatus ?? TransactionStatus.Posted;

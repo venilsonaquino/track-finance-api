@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsInt, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export type MovementsTimelineView = 'realized' | 'future' | 'all';
 
 export class MovementsMonthQueryDto {
   @Type(() => Number)
@@ -12,4 +14,8 @@ export class MovementsMonthQueryDto {
   @Min(1)
   @Max(12)
   month: number;
+
+  @IsOptional()
+  @IsIn(['realized', 'future', 'all'])
+  view?: MovementsTimelineView;
 }

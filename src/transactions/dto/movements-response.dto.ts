@@ -15,12 +15,12 @@ export class MovementWalletDto {
 
 export class MovementItemDto {
   id: string;
-  transactionId: string;
+  transactionId?: string | null;
   date: string;
   description: string;
   amount: number;
-  transactionType: TransactionType;
-  transactionStatus: TransactionStatus;
+  transactionType?: TransactionType | null;
+  transactionStatus?: TransactionStatus | null;
   source: MovementSource;
   category?: MovementCategoryDto;
   wallet?: MovementWalletDto;

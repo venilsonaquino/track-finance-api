@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -15,7 +16,11 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { TransactionMapper } from './mappers/transaction.mapper';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { TransactionStatus } from './enums/transaction-status.enum';
-import { MovementsMonthQueryDto } from './dto/movements-month-query.dto';
+import {
+  MovementsMonthQueryDto,
+  MovementsTimelineView,
+} from './dto/movements-month-query.dto';
+import { MovementsRangeQueryDto } from './dto/movements-range-query.dto';
 import {
   MovementItemDto,
   MovementsMonthlyResponseDto,
@@ -27,6 +32,12 @@ import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occ
 import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
 import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
 import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
+import { OccurrenceStatusEnum } from 'src/contracts/enums/installment-occurrence-status.enum';
+import { ContractStatusEnum } from 'src/contracts/enums/contract-status.enum';
+import { OccurrenceProjection } from 'src/contracts/occurrence-projection';
+import { ContractOccurrenceDto } from 'src/contracts/dtos/contract-occorence.dto';
+import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-range';
+import { parseIsoDateOnly } from 'src/common/utils/parse-iso-date-only';
 import { TransactionOfxService } from './transaction-ofx.service';
 import { TransactionOfxModel } from './models/transaction-ofx.model';
 
@@ -39,6 +50,8 @@ export class TransactionsService {
     private readonly installmentOccurrenceRepo: typeof InstallmentOccurrenceModel,
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
+    @InjectModel(RecurringContractModel)
+    private readonly recurringContractRepo: typeof RecurringContractModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
     private readonly transactionOfxService: TransactionOfxService,
@@ -252,99 +265,9 @@ export class TransactionsService {
     query: MovementsMonthQueryDto,
   ): Promise<MovementsMonthlyResponseDto> {
     const { start, end } = this.buildMonthRange(query.year, query.month);
-
-    const [installmentOccurrences, recurringOccurrences] = await Promise.all([
-      this.installmentOccurrenceRepo.findAll({
-        where: {
-          transactionId: { [Op.ne]: null },
-          dueDate: { [Op.between]: [start, end] },
-        },
-        include: [
-          {
-            model: InstallmentContractModel,
-            as: 'contract',
-            where: { userId },
-            required: true,
-          },
-        ],
-      }),
-      this.recurringOccurrenceRepo.findAll({
-        where: {
-          transactionId: { [Op.ne]: null },
-          dueDate: { [Op.between]: [start, end] },
-        },
-        include: [
-          {
-            model: RecurringContractModel,
-            as: 'contract',
-            where: { userId },
-            required: true,
-          },
-        ],
-      }),
-    ]);
-
-    const occurrenceTransactionIds = [
-      ...installmentOccurrences.map((o) => o.transactionId).filter(Boolean),
-      ...recurringOccurrences.map((o) => o.transactionId).filter(Boolean),
-    ] as string[];
-
-    const uniqueOccurrenceTransactionIds = Array.from(
-      new Set(occurrenceTransactionIds),
-    );
-
-    const linkedTransactions =
-      uniqueOccurrenceTransactionIds.length === 0
-        ? []
-        : await this.transactionalModel.findAll({
-            where: { id: { [Op.in]: uniqueOccurrenceTransactionIds }, userId },
-            include: [
-              { model: CategoryModel, as: 'category' },
-              { model: WalletModel, as: 'wallet' },
-            ],
-          });
-
-    const transactionWhere: any = {
-      userId,
-      depositedDate: { [Op.between]: [start, end] },
-    };
-    if (uniqueOccurrenceTransactionIds.length > 0) {
-      transactionWhere.id = { [Op.notIn]: uniqueOccurrenceTransactionIds };
-    }
-
-    const transactions = await this.transactionalModel.findAll({
-      where: transactionWhere,
-      include: [
-        { model: CategoryModel, as: 'category' },
-        { model: WalletModel, as: 'wallet' },
-      ],
+    const items = await this.buildMovementsForRange(userId, start, end, {
+      view: query.view,
     });
-
-    const transactionById = new Map(
-      linkedTransactions.map((t) => [t.id, t]),
-    );
-
-    const items: MovementItemDto[] = [
-      ...transactions.map((t) => this.mapTransactionToMovement(t)),
-      ...installmentOccurrences
-        .map((occ) =>
-          this.mapOccurrenceToMovement(
-            occ,
-            transactionById.get(occ.transactionId || ''),
-            'installment',
-          ),
-        )
-        .filter(Boolean),
-      ...recurringOccurrences
-        .map((occ) =>
-          this.mapOccurrenceToMovement(
-            occ,
-            transactionById.get(occ.transactionId || ''),
-            'recurring',
-          ),
-        )
-        .filter(Boolean),
-    ] as MovementItemDto[];
 
     items.sort((a, b) => b.date.localeCompare(a.date));
 
@@ -359,12 +282,313 @@ export class TransactionsService {
     };
   }
 
+  async getRangeMovements(
+    userId: string,
+    query: MovementsRangeQueryDto,
+  ): Promise<MovementsMonthlyResponseDto> {
+    this.validateDateRange(query.start_date, query.end_date, 5);
+
+    const items = await this.buildMovementsForRange(
+      userId,
+      query.start_date,
+      query.end_date,
+      {
+        view: query.view,
+        category_ids: query.category_ids,
+        wallet_ids: query.wallet_ids,
+      },
+    );
+
+    items.sort((a, b) => b.date.localeCompare(a.date));
+
+    return {
+      period: {
+        year: Number(query.start_date.slice(0, 4)),
+        month: Number(query.start_date.slice(5, 7)),
+        start: query.start_date,
+        end: query.end_date,
+      },
+      items,
+    };
+  }
+
   private buildMonthRange(year: number, month: number) {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 0));
     const start = startDate.toISOString().slice(0, 10);
     const end = endDate.toISOString().slice(0, 10);
     return { start, end };
+  }
+
+  private async buildMovementsForRange(
+    userId: string,
+    start: string,
+    end: string,
+    options: {
+      view?: MovementsTimelineView;
+      category_ids?: string;
+      wallet_ids?: string;
+    },
+  ): Promise<MovementItemDto[]> {
+    const view = (options.view ?? 'realized').toLowerCase() as MovementsTimelineView;
+    const includeRealized = view === 'realized' || view === 'all';
+    const includeFuture = view === 'future' || view === 'all';
+
+    const categoryIds = this.parseIds(options.category_ids);
+    const walletIds = this.parseIds(options.wallet_ids);
+
+    const items: MovementItemDto[] = [];
+
+    if (includeRealized) {
+      const contractWhere: any = { userId };
+      if (categoryIds) {
+        contractWhere.categoryId = { [Op.in]: categoryIds };
+      }
+      if (walletIds) {
+        contractWhere.walletId = { [Op.in]: walletIds };
+      }
+
+      const [installmentOccurrences, recurringOccurrences] = await Promise.all([
+        this.installmentOccurrenceRepo.findAll({
+          where: {
+            transactionId: { [Op.ne]: null },
+            dueDate: { [Op.between]: [start, end] },
+          },
+          include: [
+            {
+              model: InstallmentContractModel,
+              as: 'contract',
+              where: contractWhere,
+              required: true,
+            },
+          ],
+        }),
+        this.recurringOccurrenceRepo.findAll({
+          where: {
+            transactionId: { [Op.ne]: null },
+            dueDate: { [Op.between]: [start, end] },
+          },
+          include: [
+            {
+              model: RecurringContractModel,
+              as: 'contract',
+              where: contractWhere,
+              required: true,
+            },
+          ],
+        }),
+      ]);
+
+      const occurrenceTransactionIds = [
+        ...installmentOccurrences.map((o) => o.transactionId).filter(Boolean),
+        ...recurringOccurrences.map((o) => o.transactionId).filter(Boolean),
+      ] as string[];
+
+      const uniqueOccurrenceTransactionIds = Array.from(
+        new Set(occurrenceTransactionIds),
+      );
+
+      const linkedTransactions =
+        uniqueOccurrenceTransactionIds.length === 0
+          ? []
+          : await this.transactionalModel.findAll({
+              where: {
+                id: { [Op.in]: uniqueOccurrenceTransactionIds },
+                userId,
+              },
+              include: [
+                { model: CategoryModel, as: 'category' },
+                { model: WalletModel, as: 'wallet' },
+              ],
+            });
+
+      const transactionWhere: any = {
+        userId,
+        depositedDate: { [Op.between]: [start, end] },
+      };
+      if (categoryIds) {
+        transactionWhere.categoryId = { [Op.in]: categoryIds };
+      }
+      if (walletIds) {
+        transactionWhere.walletId = { [Op.in]: walletIds };
+      }
+      if (uniqueOccurrenceTransactionIds.length > 0) {
+        transactionWhere.id = { [Op.notIn]: uniqueOccurrenceTransactionIds };
+      }
+
+      const transactions = await this.transactionalModel.findAll({
+        where: transactionWhere,
+        include: [
+          { model: CategoryModel, as: 'category' },
+          { model: WalletModel, as: 'wallet' },
+        ],
+      });
+
+      const transactionById = new Map(
+        linkedTransactions.map((t) => [t.id, t]),
+      );
+
+      items.push(
+        ...transactions.map((t) => this.mapTransactionToMovement(t)),
+        ...installmentOccurrences
+          .map((occ) =>
+            this.mapOccurrenceToMovement(
+              occ,
+              transactionById.get(occ.transactionId || ''),
+              'installment',
+            ),
+          )
+          .filter(Boolean),
+        ...recurringOccurrences
+          .map((occ) =>
+            this.mapOccurrenceToMovement(
+              occ,
+              transactionById.get(occ.transactionId || ''),
+              'recurring',
+            ),
+          )
+          .filter(Boolean),
+      );
+    }
+
+    if (includeFuture) {
+      const startDate = parseIsoDateOnly(start) ?? new Date(`${start}T00:00:00Z`);
+      const endDate = parseIsoDateOnly(end) ?? new Date(`${end}T00:00:00Z`);
+
+      const plannedInstallmentsWhere: any = {
+        transactionId: null,
+        installmentStatus: OccurrenceStatusEnum.Scheduled,
+        dueDate: { [Op.between]: [start, end] },
+      };
+
+      const contractWhere: any = { userId };
+      if (categoryIds) {
+        contractWhere.categoryId = { [Op.in]: categoryIds };
+      }
+      if (walletIds) {
+        contractWhere.walletId = { [Op.in]: walletIds };
+      }
+
+      const [plannedInstallments, recurringContracts] = await Promise.all([
+        this.installmentOccurrenceRepo.findAll({
+          where: plannedInstallmentsWhere,
+          include: [
+            {
+              model: InstallmentContractModel,
+              as: 'contract',
+              where: contractWhere,
+              required: true,
+              include: [
+                { model: CategoryModel, as: 'category' },
+                { model: WalletModel, as: 'wallet' },
+              ],
+            },
+          ],
+        }),
+        this.recurringContractRepo.findAll({
+          where: { ...contractWhere, status: ContractStatusEnum.Active },
+          include: [
+            { model: CategoryModel, as: 'category' },
+            { model: WalletModel, as: 'wallet' },
+          ],
+        }),
+      ]);
+
+      items.push(
+        ...plannedInstallments.map((occ) =>
+          this.mapPlannedInstallmentOccurrenceToMovement(occ),
+        ),
+      );
+
+      const recurringContractIds = recurringContracts.map((c) => c.id);
+      const recurringOverrides =
+        recurringContractIds.length === 0
+          ? []
+          : await this.recurringOccurrenceRepo.findAll({
+              where: {
+                contractId: { [Op.in]: recurringContractIds },
+                dueDate: { [Op.between]: [start, end] },
+              },
+            });
+
+      const overridesByContract = new Map<string, RecurringOccurrenceModel[]>();
+      for (const override of recurringOverrides) {
+        const list = overridesByContract.get(override.contractId) ?? [];
+        list.push(override);
+        overridesByContract.set(override.contractId, list);
+      }
+
+      for (const contract of recurringContracts) {
+        const dueDates = generateDueDatesInRange(
+          contract.firstDueDate,
+          contract.installmentInterval,
+          startDate,
+          endDate,
+        );
+
+        const generated: ContractOccurrenceDto[] = dueDates.map((dueDate) => ({
+          dueDate,
+          amount: String(contract.amount),
+          status: OccurrenceStatusEnum.Scheduled,
+          transactionId: null,
+          source: 'generated',
+        }));
+
+        const overrides = (overridesByContract.get(contract.id) ?? []).map((o) =>
+          o.get({ plain: true }),
+        );
+
+        const projected = OccurrenceProjection.project(generated, overrides);
+
+        const planned = projected.filter(
+          (occ) =>
+            occ.status === OccurrenceStatusEnum.Scheduled &&
+            !occ.transactionId,
+        );
+
+        items.push(
+          ...planned.map((occ) =>
+            this.mapPlannedRecurringOccurrenceToMovement(contract, occ),
+          ),
+        );
+      }
+    }
+
+    return items;
+  }
+
+  private parseIds(value?: string): string[] | null {
+    if (!value) return null;
+    const items = value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return items.length > 0 ? items : null;
+  }
+
+  private validateDateRange(start: string, end: string, maxYears: number) {
+    const startDate = parseIsoDateOnly(start);
+    const endDate = parseIsoDateOnly(end);
+    if (!startDate || !endDate) {
+      throw new BadRequestException(
+        'Invalid date range. Expected format: YYYY-MM-DD.',
+      );
+    }
+
+    if (startDate.getTime() > endDate.getTime()) {
+      throw new BadRequestException(
+        'Invalid date range. start_date must be before or equal to end_date.',
+      );
+    }
+
+    const maxEnd = new Date(startDate);
+    maxEnd.setUTCFullYear(maxEnd.getUTCFullYear() + maxYears);
+
+    if (endDate.getTime() > maxEnd.getTime()) {
+      throw new BadRequestException(
+        `Invalid date range. Maximum range is ${maxYears} years.`,
+      );
+    }
   }
 
   private mapTransactionToMovement(
@@ -415,6 +639,63 @@ export class TransactionsService {
       contractId: (occurrence as any).contractId,
       occurrenceId: occurrence.id,
       installmentIndex: (occurrence as any).installmentIndex,
+      dueDate: occurrence.dueDate,
+    };
+  }
+
+  private mapPlannedInstallmentOccurrenceToMovement(
+    occurrence: InstallmentOccurrenceModel,
+  ): MovementItemDto {
+    const contract = occurrence.contract as InstallmentContractModel | undefined;
+    const description = contract?.description
+      ? `${contract.description} • Parcela ${occurrence.installmentIndex}/${contract.installmentsCount}`
+      : `Parcela ${occurrence.installmentIndex}/${contract?.installmentsCount ?? ''}`.trim();
+
+    return {
+      id: occurrence.id,
+      transactionId: null,
+      date: occurrence.dueDate,
+      description,
+      amount: Number(occurrence.amount),
+      transactionType: null,
+      transactionStatus: null,
+      source: 'installment',
+      category: contract?.category
+        ? { id: contract.category.id, name: contract.category.name }
+        : undefined,
+      wallet: contract?.wallet
+        ? { id: contract.wallet.id, name: contract.wallet.name }
+        : undefined,
+      contractId: occurrence.contractId,
+      occurrenceId: occurrence.id,
+      installmentIndex: occurrence.installmentIndex,
+      dueDate: occurrence.dueDate,
+    };
+  }
+
+  private mapPlannedRecurringOccurrenceToMovement(
+    contract: RecurringContractModel,
+    occurrence: ContractOccurrenceDto,
+  ): MovementItemDto {
+    const description =
+      contract.description ?? `Recorrencia ${occurrence.dueDate}`;
+
+    return {
+      id: `recurring:${contract.id}:${occurrence.dueDate}`,
+      transactionId: occurrence.transactionId ?? null,
+      date: occurrence.dueDate,
+      description,
+      amount: Number(occurrence.amount),
+      transactionType: null,
+      transactionStatus: null,
+      source: 'recurring',
+      category: contract.category
+        ? { id: contract.category.id, name: contract.category.name }
+        : undefined,
+      wallet: contract.wallet
+        ? { id: contract.wallet.id, name: contract.wallet.name }
+        : undefined,
+      contractId: contract.id,
       dueDate: occurrence.dueDate,
     };
   }
