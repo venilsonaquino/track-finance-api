@@ -54,7 +54,7 @@ export class TransactionsService {
       const transaction = new TransactionEntity({
         depositedDate: createTransactionDto.depositedDate,
         description: createTransactionDto.description,
-        amount: +createTransactionDto.amount,
+        amount: Math.abs(+createTransactionDto.amount),
         userId: userId,
         categoryId: createTransactionDto.categoryId,
         walletId: createTransactionDto.walletId,
@@ -122,7 +122,7 @@ export class TransactionsService {
         const transaction = new TransactionEntity({
           depositedDate: dto.depositedDate,
           description: dto.description,
-          amount: +dto.amount,
+          amount: Math.abs(+dto.amount),
           userId: userId,
           categoryId: dto.categoryId,
           walletId: dto.walletId,
@@ -440,7 +440,7 @@ export class TransactionsService {
     const transaction = new TransactionEntity({
       depositedDate: updateTransactionDto.depositedDate,
       description: updateTransactionDto.description,
-      amount: +updateTransactionDto.amount,
+      amount: Math.abs(+updateTransactionDto.amount),
       userId: userId,
       categoryId: updateTransactionDto.categoryId,
       walletId: updateTransactionDto.walletId,

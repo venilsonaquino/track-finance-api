@@ -69,16 +69,14 @@ export class TransactionEntity {
 
   public static calculateIncome(transactions: TransactionEntity[]): number {
     return transactions
-      .filter(
-        (t) => t.amount > 0 && t.transactionType === TransactionType.Income,
-      )
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.transactionType === TransactionType.Income)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   }
 
   public static calculateExpense(transactions: TransactionEntity[]): number {
     return transactions
-      .filter((t) => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.transactionType === TransactionType.Expense)
+      .reduce((sum, t) => sum - Math.abs(t.amount), 0);
   }
 
   public static calculateMonthlyBalance(
