@@ -15,12 +15,28 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { TransactionMapper } from './mappers/transaction.mapper';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { TransactionStatus } from './enums/transaction-status.enum';
+import { MovementsMonthQueryDto } from './dto/movements-month-query.dto';
+import {
+  MovementItemDto,
+  MovementsMonthlyResponseDto,
+  MovementSource,
+} from './dto/movements-response.dto';
+import { CategoryModel } from 'src/categories/models/category.model';
+import { WalletModel } from 'src/wallets/models/wallet.model';
+import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occurrence.model';
+import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
+import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
+import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
 
 @Injectable()
 export class TransactionsService {
   constructor(
     @InjectModel(TransactionModel)
     private readonly transactionalModel: typeof TransactionModel,
+    @InjectModel(InstallmentOccurrenceModel)
+    private readonly installmentOccurrenceRepo: typeof InstallmentOccurrenceModel,
+    @InjectModel(RecurringOccurrenceModel)
+    private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
   ) {}
@@ -74,7 +90,7 @@ export class TransactionsService {
       }
 
       return createdTransaction;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
       throw new InternalServerErrorException(detailMessage);
@@ -139,7 +155,7 @@ export class TransactionsService {
       }
 
       return createdTransactions;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
       throw new InternalServerErrorException(detailMessage);
@@ -199,6 +215,178 @@ export class TransactionsService {
         monthly_expense: expense,
         monthly_balance: monthly_balance,
       },
+    };
+  }
+
+  async getMonthlyMovements(
+    userId: string,
+    query: MovementsMonthQueryDto,
+  ): Promise<MovementsMonthlyResponseDto> {
+    const { start, end } = this.buildMonthRange(query.year, query.month);
+
+    const [installmentOccurrences, recurringOccurrences] = await Promise.all([
+      this.installmentOccurrenceRepo.findAll({
+        where: {
+          transactionId: { [Op.ne]: null },
+          dueDate: { [Op.between]: [start, end] },
+        },
+        include: [
+          {
+            model: InstallmentContractModel,
+            as: 'contract',
+            where: { userId },
+            required: true,
+          },
+        ],
+      }),
+      this.recurringOccurrenceRepo.findAll({
+        where: {
+          transactionId: { [Op.ne]: null },
+          dueDate: { [Op.between]: [start, end] },
+        },
+        include: [
+          {
+            model: RecurringContractModel,
+            as: 'contract',
+            where: { userId },
+            required: true,
+          },
+        ],
+      }),
+    ]);
+
+    const occurrenceTransactionIds = [
+      ...installmentOccurrences.map((o) => o.transactionId).filter(Boolean),
+      ...recurringOccurrences.map((o) => o.transactionId).filter(Boolean),
+    ] as string[];
+
+    const uniqueOccurrenceTransactionIds = Array.from(
+      new Set(occurrenceTransactionIds),
+    );
+
+    const linkedTransactions =
+      uniqueOccurrenceTransactionIds.length === 0
+        ? []
+        : await this.transactionalModel.findAll({
+            where: { id: { [Op.in]: uniqueOccurrenceTransactionIds }, userId },
+            include: [
+              { model: CategoryModel, as: 'category' },
+              { model: WalletModel, as: 'wallet' },
+            ],
+          });
+
+    const transactionWhere: any = {
+      userId,
+      depositedDate: { [Op.between]: [start, end] },
+    };
+    if (uniqueOccurrenceTransactionIds.length > 0) {
+      transactionWhere.id = { [Op.notIn]: uniqueOccurrenceTransactionIds };
+    }
+
+    const transactions = await this.transactionalModel.findAll({
+      where: transactionWhere,
+      include: [
+        { model: CategoryModel, as: 'category' },
+        { model: WalletModel, as: 'wallet' },
+      ],
+    });
+
+    const transactionById = new Map(
+      linkedTransactions.map((t) => [t.id, t]),
+    );
+
+    const items: MovementItemDto[] = [
+      ...transactions.map((t) => this.mapTransactionToMovement(t)),
+      ...installmentOccurrences
+        .map((occ) =>
+          this.mapOccurrenceToMovement(
+            occ,
+            transactionById.get(occ.transactionId || ''),
+            'installment',
+          ),
+        )
+        .filter(Boolean),
+      ...recurringOccurrences
+        .map((occ) =>
+          this.mapOccurrenceToMovement(
+            occ,
+            transactionById.get(occ.transactionId || ''),
+            'recurring',
+          ),
+        )
+        .filter(Boolean),
+    ] as MovementItemDto[];
+
+    items.sort((a, b) => b.date.localeCompare(a.date));
+
+    return {
+      period: {
+        year: query.year,
+        month: query.month,
+        start,
+        end,
+      },
+      items,
+    };
+  }
+
+  private buildMonthRange(year: number, month: number) {
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 0));
+    const start = startDate.toISOString().slice(0, 10);
+    const end = endDate.toISOString().slice(0, 10);
+    return { start, end };
+  }
+
+  private mapTransactionToMovement(
+    transaction: TransactionModel,
+  ): MovementItemDto {
+    return {
+      id: transaction.id,
+      transactionId: transaction.id,
+      date: transaction.depositedDate,
+      description: transaction.description,
+      amount: Number(transaction.amount),
+      transactionType: transaction.transactionType,
+      transactionStatus: transaction.transactionStatus,
+      source: 'transaction',
+      category: transaction.category
+        ? { id: transaction.category.id, name: transaction.category.name }
+        : undefined,
+      wallet: transaction.wallet
+        ? { id: transaction.wallet.id, name: transaction.wallet.name }
+        : undefined,
+    };
+  }
+
+  private mapOccurrenceToMovement(
+    occurrence: InstallmentOccurrenceModel | RecurringOccurrenceModel,
+    transaction: TransactionModel | undefined,
+    source: MovementSource,
+  ): MovementItemDto | null {
+    if (!transaction) {
+      return null;
+    }
+
+    return {
+      id: occurrence.id,
+      transactionId: transaction.id,
+      date: occurrence.dueDate,
+      description: transaction.description,
+      amount: Number(transaction.amount),
+      transactionType: transaction.transactionType,
+      transactionStatus: transaction.transactionStatus,
+      source,
+      category: transaction.category
+        ? { id: transaction.category.id, name: transaction.category.name }
+        : undefined,
+      wallet: transaction.wallet
+        ? { id: transaction.wallet.id, name: transaction.wallet.name }
+        : undefined,
+      contractId: (occurrence as any).contractId,
+      occurrenceId: occurrence.id,
+      installmentIndex: (occurrence as any).installmentIndex,
+      dueDate: occurrence.dueDate,
     };
   }
 
@@ -304,7 +492,7 @@ export class TransactionsService {
       );
 
       return transactions;
-    } catch (error) {
+    } catch (error: any) {  
       console.error('Error fetching transactions by fitIds: ', error);
       const detailMessage = error?.parent?.detail || error?.message;
       throw new InternalServerErrorException(detailMessage);

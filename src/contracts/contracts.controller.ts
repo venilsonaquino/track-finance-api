@@ -15,6 +15,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
+import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -56,6 +57,21 @@ export class ContractsController {
     return this.service.upsertOccurrenceOverride(
       contractId,
       dueDate,
+      dto,
+      user.id,
+    );
+  }
+
+  @Post('installments/:contractId/occurrences/:installmentIndex/pay')
+  async payInstallment(
+    @Param('contractId') contractId: string,
+    @Param('installmentIndex') installmentIndex: string,
+    @Body() dto: PayInstallmentOccurrenceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.payInstallmentOccurrence(
+      contractId,
+      Number(installmentIndex),
       dto,
       user.id,
     );

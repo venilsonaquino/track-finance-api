@@ -17,6 +17,8 @@ describe('ContractsService', () => {
   let recurringOccurrenceRepo: any;
   let walletRepo: any;
   let categoryRepo: any;
+  let transactionRepo: any;
+  let walletFacade: any;
 
   beforeEach(() => {
     sequelize = {
@@ -24,9 +26,11 @@ describe('ContractsService', () => {
     };
     contractRepo = {
       create: jest.fn(),
+      findOne: jest.fn(),
     };
     occurrenceRepo = {
       bulkCreate: jest.fn(),
+      findOne: jest.fn(),
     };
     recurringContractRepo = {
       create: jest.fn(),
@@ -43,6 +47,12 @@ describe('ContractsService', () => {
     categoryRepo = {
       findOne: jest.fn(),
     };
+    transactionRepo = {
+      create: jest.fn(),
+    };
+    walletFacade = {
+      adjustWalletBalance: jest.fn(),
+    };
 
     service = new ContractsService(
       sequelize,
@@ -52,6 +62,8 @@ describe('ContractsService', () => {
       recurringOccurrenceRepo,
       walletRepo,
       categoryRepo,
+      transactionRepo,
+      walletFacade,
     );
   });
 
@@ -250,6 +262,42 @@ describe('ContractsService', () => {
 
     expect(existing.update).toHaveBeenCalledTimes(1);
     expect(result.occurrence.status).toBe(OccurrenceStatusEnum.Posted);
+  });
+
+  it('pays installment and creates transaction', async () => {
+    contractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      installmentsCount: 3,
+      description: 'Notebook',
+    });
+    occurrenceRepo.findOne.mockResolvedValueOnce({
+      id: 'occ-1',
+      contractId: 'contract-1',
+      installmentIndex: 1,
+      dueDate: '2026-02-10',
+      amount: '100.00',
+      transactionId: null,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    });
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-1',
+      amount: '100.00',
+      transactionType: 'EXPENSE',
+    });
+
+    const result = await service.payInstallmentOccurrence(
+      'contract-1',
+      1,
+      { transactionType: 'EXPENSE' } as any,
+      'user-1',
+    );
+
+    expect(transactionRepo.create).toHaveBeenCalledTimes(1);
+    expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
+    expect(result.transaction.id).toBe('tx-1');
   });
 
   it('returns generated and override occurrences for getContractOccurrences', async () => {

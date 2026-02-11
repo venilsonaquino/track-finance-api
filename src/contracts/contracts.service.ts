@@ -29,6 +29,11 @@ import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.d
 import { isDueDateOnSchedule } from 'src/common/utils/is-due-date-on-schedule';
 import { WalletModel } from 'src/wallets/models/wallet.model';
 import { CategoryModel } from 'src/categories/models/category.model';
+import { TransactionModel } from 'src/transactions/models/transaction.model';
+import { WalletFacade } from 'src/wallets/facades/wallet.facade';
+import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 
 @Injectable()
 export class ContractsService {
@@ -46,6 +51,9 @@ export class ContractsService {
     private readonly walletRepo: typeof WalletModel,
     @InjectModel(CategoryModel)
     private readonly categoryRepo: typeof CategoryModel,
+    @InjectModel(TransactionModel)
+    private readonly transactionRepo: typeof TransactionModel,
+    private readonly walletFacade: WalletFacade,
   ) {}
 
   async createInstallmentContract(
@@ -298,6 +306,87 @@ export class ContractsService {
     });
     if (!contract) throw new NotFoundException('Contract not found.');
     return contract;
+  }
+
+  async payInstallmentOccurrence(
+    contractId: string,
+    installmentIndex: number,
+    dto: PayInstallmentOccurrenceDto,
+    userId: string,
+  ) {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+
+    const occurrence = await this.occurrenceRepo.findOne({
+      where: { contractId, installmentIndex },
+    });
+    if (!occurrence) {
+      throw new NotFoundException('Occurrence not found.');
+    }
+
+    if (occurrence.transactionId) {
+      throw new BadRequestException('Occurrence already paid.');
+    }
+
+    const amount = String(occurrence.amount);
+    const description =
+      dto.description ??
+      contract.description ??
+      `Parcela ${installmentIndex}/${contract.installmentsCount}`;
+    const depositedDate = dto.depositedDate ?? occurrence.dueDate;
+    const transactionStatus =
+      dto.transactionStatus ?? TransactionStatus.Posted;
+
+    return this.sequelize.transaction(async (transaction) => {
+      const created = await this.transactionRepo.create(
+        {
+          depositedDate,
+          description,
+          amount,
+          transactionType: dto.transactionType,
+          transactionStatus,
+          fitId: dto.fitId,
+          accountId: dto.accountId,
+          accountType: dto.accountType,
+          bankId: dto.bankId,
+          bankName: dto.bankName,
+          currency: dto.currency,
+          userId,
+          categoryId: contract.categoryId,
+          walletId: contract.walletId,
+        },
+        { transaction },
+      );
+
+      await occurrence.update(
+        {
+          installmentStatus: OccurrenceStatusEnum.Posted,
+          transactionId: created.id,
+        },
+        { transaction },
+      );
+
+      if (dto.affectBalance ?? true) {
+        const delta = TransactionEntity.resolveBalanceDelta(
+          Number(created.amount),
+          created.transactionType,
+        );
+        await this.walletFacade.adjustWalletBalance(
+          contract.walletId,
+          userId,
+          delta,
+        );
+      }
+
+      return {
+        transaction: created,
+        occurrence,
+      };
+    });
   }
 
   private calculateInstallmentAmount(

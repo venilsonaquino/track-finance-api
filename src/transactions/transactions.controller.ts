@@ -19,6 +19,7 @@ import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { PayloadResponse } from 'src/auth/dto/login-response.dto';
 import { DateRangeDto } from './dto/date-range.dto';
+import { MovementsMonthQueryDto } from './dto/movements-month-query.dto';
 
 @UseGuards(AuthGuard)
 @Controller('transactions')
@@ -53,6 +54,14 @@ export class TransactionsController {
   ) {
     const { id } = user;
     return await this.transactionsService.findAllAndDateRange(id, query);
+  }
+
+  @Get('movements/month')
+  async getMonthlyMovements(
+    @CurrentUser() user: PayloadResponse,
+    @Query() query: MovementsMonthQueryDto,
+  ) {
+    return await this.transactionsService.getMonthlyMovements(user.id, query);
   }
 
   @Get(':id')
