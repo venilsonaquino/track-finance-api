@@ -56,7 +56,6 @@ export class TransactionModel extends Model<TransactionModel> {
     values: [
       TransactionType.Income,
       TransactionType.Expense,
-      TransactionType.Transfer,
     ],
     allowNull: false,
   })

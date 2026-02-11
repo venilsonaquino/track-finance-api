@@ -113,7 +113,7 @@ describe('TransactionsService', () => {
       userId: 'user-1',
       categoryId: 'cat-1',
       walletId: 'wallet-1',
-      transactionType: TransactionType.Transfer,
+      transactionType: TransactionType.Expense,
       transactionStatus: TransactionStatus.Posted,
       affectBalance: false,
     } as any;

@@ -28,7 +28,7 @@ export class CreateTransactionDto {
   @IsNotEmpty()
   @IsDefined()
   @IsEnum(TransactionType, {
-    message: 'transactionType must be one of: INCOME, EXPENSE, TRANSFER',
+    message: 'transactionType must be one of: INCOME, EXPENSE',
   })
   transactionType: TransactionType;
 
