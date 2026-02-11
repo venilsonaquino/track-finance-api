@@ -34,6 +34,7 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
+import { TransactionOfxService } from 'src/transactions/transaction-ofx.service';
 
 @Injectable()
 export class ContractsService {
@@ -54,6 +55,7 @@ export class ContractsService {
     @InjectModel(TransactionModel)
     private readonly transactionRepo: typeof TransactionModel,
     private readonly walletFacade: WalletFacade,
+    private readonly transactionOfxService: TransactionOfxService,
   ) {}
 
   async createInstallmentContract(
@@ -349,17 +351,17 @@ export class ContractsService {
           amount,
           transactionType: dto.transactionType,
           transactionStatus,
-          fitId: dto.fitId,
-          accountId: dto.accountId,
-          accountType: dto.accountType,
-          bankId: dto.bankId,
-          bankName: dto.bankName,
-          currency: dto.currency,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
+      );
+
+      await this.transactionOfxService.syncDetails(
+        created.id,
+        this.buildOfxPayload(dto),
+        transaction,
       );
 
       await occurrence.update(
@@ -430,17 +432,17 @@ export class ContractsService {
           amount,
           transactionType: dto.transactionType,
           transactionStatus,
-          fitId: dto.fitId,
-          accountId: dto.accountId,
-          accountType: dto.accountType,
-          bankId: dto.bankId,
-          bankName: dto.bankName,
-          currency: dto.currency,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
+      );
+
+      await this.transactionOfxService.syncDetails(
+        created.id,
+        this.buildOfxPayload(dto),
+        transaction,
       );
 
       await occurrence.update(
@@ -468,6 +470,19 @@ export class ContractsService {
         occurrence,
       };
     });
+  }
+
+  private buildOfxPayload(dto: Partial<PayInstallmentOccurrenceDto>) {
+    return {
+      ofx: {
+        fitId: dto.fitId,
+        accountId: dto.accountId,
+        accountType: dto.accountType,
+        bankId: dto.bankId,
+        bankName: dto.bankName,
+        currency: dto.currency,
+      },
+    } as any;
   }
 
   private calculateInstallmentAmount(

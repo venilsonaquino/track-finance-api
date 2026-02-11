@@ -10,7 +10,7 @@ import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 
 export class PayInstallmentOccurrenceDto {
   @IsEnum(TransactionType, {
-    message: 'transactionType must be one of: INCOME, EXPENSE, TRANSFER',
+    message: 'transactionType must be one of: INCOME, EXPENSE',
   })
   transactionType: TransactionType;
 

@@ -27,6 +27,8 @@ import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occ
 import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
 import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
 import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
+import { TransactionOfxService } from './transaction-ofx.service';
+import { TransactionOfxModel } from './models/transaction-ofx.model';
 
 @Injectable()
 export class TransactionsService {
@@ -39,6 +41,7 @@ export class TransactionsService {
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
+    private readonly transactionOfxService: TransactionOfxService,
   ) {}
 
   async create(createTransactionDto: CreateTransactionDto, userId: string) {
@@ -51,25 +54,33 @@ export class TransactionsService {
       const transaction = new TransactionEntity({
         depositedDate: createTransactionDto.depositedDate,
         description: createTransactionDto.description,
-        amount: +createTransactionDto.amount,
+        amount: Math.abs(+createTransactionDto.amount),
         userId: userId,
         categoryId: createTransactionDto.categoryId,
-        fitId: createTransactionDto.fitId,
         walletId: createTransactionDto.walletId,
         transactionType: createTransactionDto.transactionType,
         transactionStatus:
           createTransactionDto.transactionStatus ?? TransactionStatus.Posted,
-        accountId: createTransactionDto.accountId,
-        accountType: createTransactionDto.accountType,
-        bankId: createTransactionDto.bankId,
-        bankName: createTransactionDto.bankName,
-        currency: createTransactionDto.currency,
-        // transactionDate: createTransactionDto.transactionDate,
       });
 
-      const createdTransaction = await this.transactionalModel.create(
-        transaction as any,
+      const ofxPayload = this.transactionOfxService.buildPayload(
+        createTransactionDto,
+        transaction.id,
       );
+
+      const sequelize = this.transactionalModel.sequelize;
+      const createdTransaction = sequelize
+        ? await sequelize.transaction(async (tx) => {
+            const created = await this.transactionalModel.create(
+              transaction as any,
+              { transaction: tx },
+            );
+            if (ofxPayload) {
+              await this.transactionOfxService.createDetails(ofxPayload, tx);
+            }
+            return created;
+          })
+        : await this.transactionalModel.create(transaction as any);
 
       if (createTransactionDto.affectBalance) {
         this.logger.log(
@@ -111,26 +122,44 @@ export class TransactionsService {
         const transaction = new TransactionEntity({
           depositedDate: dto.depositedDate,
           description: dto.description,
-          amount: +dto.amount,
+          amount: Math.abs(+dto.amount),
           userId: userId,
           categoryId: dto.categoryId,
-          fitId: dto.fitId,
           walletId: dto.walletId,
           transactionType: dto.transactionType,
           transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
-          accountId: dto.accountId,
-          accountType: dto.accountType,
-          bankId: dto.bankId,
-          bankName: dto.bankName,
-          currency: dto.currency,
         });
 
         return transaction;
       });
 
-      const createdTransactions = await this.transactionalModel.bulkCreate(
-        transactions as any,
-      );
+      const sequelize = this.transactionalModel.sequelize;
+      const createdTransactions = sequelize
+        ? await sequelize.transaction(async (tx) => {
+            const created = await this.transactionalModel.bulkCreate(
+              transactions as any,
+              { transaction: tx },
+            );
+
+            const ofxPayloads = createTransactionDtos
+              .map((dto, index) =>
+                this.transactionOfxService.buildPayload(
+                  dto,
+                  transactions[index].id,
+                ),
+              )
+              .filter(Boolean) as TransactionOfxModel[];
+
+            if (ofxPayloads.length > 0) {
+              await this.transactionOfxService.bulkCreateDetails(
+                ofxPayloads,
+                tx,
+              );
+            }
+
+            return created;
+          })
+        : await this.transactionalModel.bulkCreate(transactions as any);
 
       for (const dto of createTransactionDtos) {
         if (!dto.affectBalance) {
@@ -192,7 +221,7 @@ export class TransactionsService {
     const transactions = await this.transactionalModel.findAll({
       where: whereCondition,
       order: [['depositedDate', 'DESC']],
-      include: ['category', 'wallet'],
+      include: ['category', 'wallet', 'ofx'],
     });
 
     const balance = await this.walletFacade.getWalletBalance(userId);
@@ -393,7 +422,7 @@ export class TransactionsService {
   async findOne(id: string, userId: string) {
     const transaction = await this.transactionalModel.findOne({
       where: { id, userId },
-      include: ['user', 'category'],
+      include: ['user', 'category', 'ofx'],
     });
 
     if (!transaction) {
@@ -411,28 +440,38 @@ export class TransactionsService {
     const transaction = new TransactionEntity({
       depositedDate: updateTransactionDto.depositedDate,
       description: updateTransactionDto.description,
-      amount: +updateTransactionDto.amount,
+      amount: Math.abs(+updateTransactionDto.amount),
       userId: userId,
       categoryId: updateTransactionDto.categoryId,
-      fitId: updateTransactionDto.fitId,
       walletId: updateTransactionDto.walletId,
       transactionType: updateTransactionDto.transactionType,
       transactionStatus: updateTransactionDto.transactionStatus,
-      accountId: updateTransactionDto.accountId,
-      accountType: updateTransactionDto.accountType,
-      bankId: updateTransactionDto.bankId,
-      bankName: updateTransactionDto.bankName,
-      currency: updateTransactionDto.currency,
-      // transactionDate: updateTransactionDto.transactionDate,
     });
 
-    const [affectedCount, updated] = await this.transactionalModel.update(
-      transaction as any,
-      {
-        where: { id, userId },
-        returning: true,
-      },
-    );
+    const sequelize = this.transactionalModel.sequelize;
+    const [affectedCount, updated] = sequelize
+      ? await sequelize.transaction(async (tx) => {
+          const result = await this.transactionalModel.update(
+            transaction as any,
+            {
+              where: { id, userId },
+              returning: true,
+              transaction: tx,
+            },
+          );
+
+          await this.transactionOfxService.syncDetails(
+            id,
+            updateTransactionDto,
+            tx,
+          );
+
+          return result;
+        })
+      : await this.transactionalModel.update(transaction as any, {
+          where: { id, userId },
+          returning: true,
+        });
 
     if (affectedCount == 0 && updated.length == 0) {
       throw new NotFoundException(`Transaction with id ${id} not found`);
@@ -463,7 +502,7 @@ export class TransactionsService {
         },
         userId: userId,
       },
-      include: ['category', 'wallet'],
+      include: ['category', 'wallet', 'ofx'],
       order: [['created_at', 'DESC']],
     });
 
@@ -478,13 +517,28 @@ export class TransactionsService {
     userId: string,
   ): Promise<TransactionEntity[]> {
     try {
+      const cleanFitIds = (fitIds || []).filter(
+        (fitId) => !!fitId && typeof fitId === 'string',
+      );
+      if (cleanFitIds.length === 0) {
+        return [];
+      }
+
       // Busca por transações que possuem fitId e o userId correspondente
       const transactionsModel = await this.transactionalModel.findAll({
         where: {
-          fitId: fitIds,
           userId: userId,
         },
-        include: ['category', 'wallet'],
+        include: [
+          'category',
+          'wallet',
+          {
+            model: TransactionOfxModel,
+            as: 'ofx',
+            where: { fitId: cleanFitIds },
+            required: true,
+          },
+        ],
       });
 
       const transactions = transactionsModel.map((t) =>
@@ -498,4 +552,5 @@ export class TransactionsService {
       throw new InternalServerErrorException(detailMessage);
     }
   }
+
 }

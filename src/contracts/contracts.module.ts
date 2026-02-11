@@ -10,6 +10,7 @@ import { WalletModel } from 'src/wallets/models/wallet.model';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { WalletsModule } from 'src/wallets/wallets.module';
+import { TransactionsModule } from 'src/transactions/transactions.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { WalletsModule } from 'src/wallets/wallets.module';
       TransactionModel,
     ]),
     WalletsModule,
+    TransactionsModule,
   ],
   providers: [ContractsService],
   controllers: [ContractsController],

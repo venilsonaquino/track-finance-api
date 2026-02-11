@@ -7,6 +7,7 @@ import { TransactionStatus } from 'src/transactions/enums/transaction-status.enu
 describe('TransactionsService', () => {
   let service: TransactionsService;
   let transactionalModel: any;
+  let transactionOfxService: any;
   let installmentOccurrenceRepo: any;
   let recurringOccurrenceRepo: any;
   let walletFacade: any;
@@ -16,6 +17,12 @@ describe('TransactionsService', () => {
     transactionalModel = {
       create: jest.fn(),
       bulkCreate: jest.fn(),
+    };
+    transactionOfxService = {
+      buildPayload: jest.fn().mockReturnValue(null),
+      createDetails: jest.fn(),
+      bulkCreateDetails: jest.fn(),
+      syncDetails: jest.fn(),
     };
     installmentOccurrenceRepo = {
       findAll: jest.fn(),
@@ -36,6 +43,7 @@ describe('TransactionsService', () => {
       recurringOccurrenceRepo as any,
       walletFacade as any,
       logger as any,
+      transactionOfxService as any,
     );
   });
 
@@ -105,7 +113,7 @@ describe('TransactionsService', () => {
       userId: 'user-1',
       categoryId: 'cat-1',
       walletId: 'wallet-1',
-      transactionType: TransactionType.Transfer,
+      transactionType: TransactionType.Expense,
       transactionStatus: TransactionStatus.Posted,
       affectBalance: false,
     } as any;

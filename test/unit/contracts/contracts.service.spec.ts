@@ -19,6 +19,7 @@ describe('ContractsService', () => {
   let categoryRepo: any;
   let transactionRepo: any;
   let walletFacade: any;
+  let transactionOfxService: any;
 
   beforeEach(() => {
     sequelize = {
@@ -53,6 +54,9 @@ describe('ContractsService', () => {
     walletFacade = {
       adjustWalletBalance: jest.fn(),
     };
+    transactionOfxService = {
+      syncDetails: jest.fn(),
+    };
 
     service = new ContractsService(
       sequelize,
@@ -64,6 +68,7 @@ describe('ContractsService', () => {
       categoryRepo,
       transactionRepo,
       walletFacade,
+      transactionOfxService,
     );
   });
 
