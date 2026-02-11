@@ -31,7 +31,7 @@ export class TransactionEntity {
       description: string;
       amount: number;
       userId: string;
-      categoryId: string | null;
+      categoryId: string;
       walletId: string;
       transactionType: TransactionType;
       transactionStatus?: TransactionStatus | null;

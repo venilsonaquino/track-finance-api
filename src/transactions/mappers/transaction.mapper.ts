@@ -7,6 +7,7 @@ export class TransactionMapper {
       id: model.id,
       depositedDate: model.depositedDate,
       description: model.description,
+      amount: Number(model.amount),
       userId: model.userId,
       categoryId: model.categoryId,
       walletId: model.walletId,

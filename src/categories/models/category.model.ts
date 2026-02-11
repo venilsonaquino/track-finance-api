@@ -59,7 +59,7 @@ export class CategoryModel extends Model<CategoryModel> {
     type: DataType.STRING(26),
     allowNull: true,
   })
-  budgetGroupId: string;
+  budgetGroupId: string | null;
 
   @BelongsTo(() => BudgetGroupModel)
   budgetGroup: BudgetGroupModel;

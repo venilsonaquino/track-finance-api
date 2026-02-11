@@ -6,7 +6,7 @@ export class WalletEntity {
   name: string;
   description: string;
   walletType: string | null;
-  balance: number | null;
+  balance: number;
   userId: string;
   bankId: string | null;
 
@@ -25,7 +25,7 @@ export class WalletEntity {
     this.name = params.name;
     this.description = params.description;
     this.walletType = params.walletType;
-    this.balance = MoneyHelper.toCents(params.balance);
+    this.balance = MoneyHelper.toCents(params.balance ?? 0);
     this.userId = params.userId;
     this.bankId = params.bankId;
   }
