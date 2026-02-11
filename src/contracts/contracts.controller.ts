@@ -77,6 +77,21 @@ export class ContractsController {
     );
   }
 
+  @Post('recurring/:contractId/occurrences/:dueDate/pay')
+  async payRecurring(
+    @Param('contractId') contractId: string,
+    @Param('dueDate') dueDate: string,
+    @Body() dto: PayInstallmentOccurrenceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.payRecurringOccurrence(
+      contractId,
+      dueDate,
+      dto,
+      user.id,
+    );
+  }
+
   @Get(':contractId')
   async getContractById(
     @Param('contractId') contractId: string,

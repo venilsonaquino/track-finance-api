@@ -389,6 +389,87 @@ export class ContractsService {
     });
   }
 
+  async payRecurringOccurrence(
+    contractId: string,
+    dueDate: string,
+    dto: PayInstallmentOccurrenceDto,
+    userId: string,
+  ) {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+
+    const occurrence = await this.recurringOccurrenceRepo.findOne({
+      where: { contractId, dueDate },
+    });
+    if (!occurrence) {
+      throw new NotFoundException('Occurrence not found.');
+    }
+
+    if (occurrence.transactionId) {
+      throw new BadRequestException('Occurrence already paid.');
+    }
+
+    const amount = String(occurrence.amount);
+    const description =
+      dto.description ??
+      contract.description ??
+      `Recorrencia ${dueDate}`;
+    const depositedDate = dto.depositedDate ?? occurrence.dueDate;
+    const transactionStatus =
+      dto.transactionStatus ?? TransactionStatus.Posted;
+
+    return this.sequelize.transaction(async (transaction) => {
+      const created = await this.transactionRepo.create(
+        {
+          depositedDate,
+          description,
+          amount,
+          transactionType: dto.transactionType,
+          transactionStatus,
+          fitId: dto.fitId,
+          accountId: dto.accountId,
+          accountType: dto.accountType,
+          bankId: dto.bankId,
+          bankName: dto.bankName,
+          currency: dto.currency,
+          userId,
+          categoryId: contract.categoryId,
+          walletId: contract.walletId,
+        },
+        { transaction },
+      );
+
+      await occurrence.update(
+        {
+          status: OccurrenceStatusEnum.Posted,
+          transactionId: created.id,
+        },
+        { transaction },
+      );
+
+      if (dto.affectBalance ?? true) {
+        const delta = TransactionEntity.resolveBalanceDelta(
+          Number(created.amount),
+          created.transactionType,
+        );
+        await this.walletFacade.adjustWalletBalance(
+          contract.walletId,
+          userId,
+          delta,
+        );
+      }
+
+      return {
+        transaction: created,
+        occurrence,
+      };
+    });
+  }
+
   private calculateInstallmentAmount(
     totalAmount: string,
     installmentsCount: number,

@@ -300,6 +300,40 @@ describe('ContractsService', () => {
     expect(result.transaction.id).toBe('tx-1');
   });
 
+  it('pays recurring occurrence and creates transaction', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'rec-1',
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      description: 'Assinatura',
+    });
+    recurringOccurrenceRepo.findOne.mockResolvedValueOnce({
+      id: 'roc-1',
+      contractId: 'rec-1',
+      dueDate: '2026-02-15',
+      amount: '50.00',
+      transactionId: null,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    });
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-2',
+      amount: '50.00',
+      transactionType: 'EXPENSE',
+    });
+
+    const result = await service.payRecurringOccurrence(
+      'rec-1',
+      '2026-02-15',
+      { transactionType: 'EXPENSE' } as any,
+      'user-1',
+    );
+
+    expect(transactionRepo.create).toHaveBeenCalledTimes(1);
+    expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
+    expect(result.transaction.id).toBe('tx-2');
+  });
+
   it('returns generated and override occurrences for getContractOccurrences', async () => {
     recurringContractRepo.findOne.mockResolvedValueOnce({
       id: 'contract-1',
