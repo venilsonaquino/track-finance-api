@@ -10,6 +10,7 @@ import { InstallmentContractModel } from 'src/contracts/models/installment-contr
 import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
 import { WalletsModule } from 'src/wallets/wallets.module';
 import { LoggerModule } from 'src/config/logging/logger.module';
+import { TransactionOfxService } from './transaction-ofx.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { LoggerModule } from 'src/config/logging/logger.module';
     LoggerModule,
   ],
   controllers: [TransactionsController],
-  providers: [TransactionsService],
-  exports: [TransactionsService],
+  providers: [TransactionsService, TransactionOfxService],
+  exports: [TransactionsService, TransactionOfxService],
 })
 export class TransactionsModule {}

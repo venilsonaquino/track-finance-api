@@ -27,6 +27,7 @@ import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occ
 import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
 import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
 import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
+import { TransactionOfxService } from './transaction-ofx.service';
 import { TransactionOfxModel } from './models/transaction-ofx.model';
 
 @Injectable()
@@ -34,14 +35,13 @@ export class TransactionsService {
   constructor(
     @InjectModel(TransactionModel)
     private readonly transactionalModel: typeof TransactionModel,
-    @InjectModel(TransactionOfxModel)
-    private readonly transactionOfxModel: typeof TransactionOfxModel,
     @InjectModel(InstallmentOccurrenceModel)
     private readonly installmentOccurrenceRepo: typeof InstallmentOccurrenceModel,
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
+    private readonly transactionOfxService: TransactionOfxService,
   ) {}
 
   async create(createTransactionDto: CreateTransactionDto, userId: string) {
@@ -63,7 +63,7 @@ export class TransactionsService {
           createTransactionDto.transactionStatus ?? TransactionStatus.Posted,
       });
 
-      const ofxPayload = this.buildOfxPayload(
+      const ofxPayload = this.transactionOfxService.buildPayload(
         createTransactionDto,
         transaction.id,
       );
@@ -76,9 +76,7 @@ export class TransactionsService {
               { transaction: tx },
             );
             if (ofxPayload) {
-              await this.transactionOfxModel.create(ofxPayload, {
-                transaction: tx,
-              });
+              await this.transactionOfxService.createDetails(ofxPayload, tx);
             }
             return created;
           })
@@ -145,14 +143,18 @@ export class TransactionsService {
 
             const ofxPayloads = createTransactionDtos
               .map((dto, index) =>
-                this.buildOfxPayload(dto, transactions[index].id),
+                this.transactionOfxService.buildPayload(
+                  dto,
+                  transactions[index].id,
+                ),
               )
               .filter(Boolean) as TransactionOfxModel[];
 
             if (ofxPayloads.length > 0) {
-              await this.transactionOfxModel.bulkCreate(ofxPayloads, {
-                transaction: tx,
-              });
+              await this.transactionOfxService.bulkCreateDetails(
+                ofxPayloads,
+                tx,
+              );
             }
 
             return created;
@@ -458,7 +460,11 @@ export class TransactionsService {
             },
           );
 
-          await this.syncOfxDetails(id, updateTransactionDto, tx);
+          await this.transactionOfxService.syncDetails(
+            id,
+            updateTransactionDto,
+            tx,
+          );
 
           return result;
         })
@@ -547,113 +553,4 @@ export class TransactionsService {
     }
   }
 
-  private normalizeOfxValue(value?: string | null) {
-    if (value === undefined || value === null) {
-      return null;
-    }
-    const trimmed = typeof value === 'string' ? value.trim() : String(value);
-    return trimmed.length === 0 ? null : trimmed;
-  }
-
-  private buildOfxPayload(
-    dto: Partial<CreateTransactionDto>,
-    transactionId: string,
-  ) {
-    const payload: Partial<TransactionOfxModel> = {
-      transactionId,
-      fitId: this.normalizeOfxValue(dto.fitId),
-      accountId: this.normalizeOfxValue(dto.accountId),
-      accountType: this.normalizeOfxValue(dto.accountType),
-      bankId: this.normalizeOfxValue(dto.bankId),
-      bankName: this.normalizeOfxValue(dto.bankName),
-      currency: this.normalizeOfxValue(dto.currency),
-    };
-
-    const hasAnyValue = [
-      payload.fitId,
-      payload.accountId,
-      payload.accountType,
-      payload.bankId,
-      payload.bankName,
-      payload.currency,
-    ].some(
-      (value) => value !== null && value !== undefined,
-    );
-
-    return hasAnyValue ? payload : null;
-  }
-
-  private hasOfxUpdate(dto: Partial<CreateTransactionDto>) {
-    const keys: (keyof CreateTransactionDto)[] = [
-      'fitId',
-      'accountId',
-      'accountType',
-      'bankId',
-      'bankName',
-      'currency',
-    ];
-    return keys.some((key) => Object.prototype.hasOwnProperty.call(dto, key));
-  }
-
-  private async syncOfxDetails(
-    transactionId: string,
-    dto: Partial<CreateTransactionDto>,
-    transaction?: any,
-  ) {
-    if (!this.hasOfxUpdate(dto)) {
-      return;
-    }
-
-    const updates: Partial<TransactionOfxModel> = {};
-    if (Object.prototype.hasOwnProperty.call(dto, 'fitId')) {
-      updates.fitId = this.normalizeOfxValue(dto.fitId);
-    }
-    if (Object.prototype.hasOwnProperty.call(dto, 'accountId')) {
-      updates.accountId = this.normalizeOfxValue(dto.accountId);
-    }
-    if (Object.prototype.hasOwnProperty.call(dto, 'accountType')) {
-      updates.accountType = this.normalizeOfxValue(dto.accountType);
-    }
-    if (Object.prototype.hasOwnProperty.call(dto, 'bankId')) {
-      updates.bankId = this.normalizeOfxValue(dto.bankId);
-    }
-    if (Object.prototype.hasOwnProperty.call(dto, 'bankName')) {
-      updates.bankName = this.normalizeOfxValue(dto.bankName);
-    }
-    if (Object.prototype.hasOwnProperty.call(dto, 'currency')) {
-      updates.currency = this.normalizeOfxValue(dto.currency);
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return;
-    }
-
-    const hasAnyValue = Object.values(updates).some(
-      (value) => value !== null && value !== undefined,
-    );
-
-    if (!hasAnyValue) {
-      await this.transactionOfxModel.destroy({
-        where: { transactionId },
-        transaction,
-      });
-      return;
-    }
-
-    const existing = await this.transactionOfxModel.findOne({
-      where: { transactionId },
-      transaction,
-    });
-
-    if (existing) {
-      await existing.update(updates, { transaction });
-      return;
-    }
-
-    const payload = {
-      transactionId,
-      ...updates,
-    };
-    await this.transactionOfxModel.create(payload as any, { transaction });
-  }
 }

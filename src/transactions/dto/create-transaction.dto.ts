@@ -13,6 +13,7 @@ import { Type } from 'class-transformer';
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
 import { InstallmentInfoDto } from 'src/contracts/dtos/installment-info.dto';
+import { OfxDetailsDto } from './ofx-details.dto';
 
 export class CreateTransactionDto {
   @IsNotEmpty()
@@ -67,30 +68,8 @@ export class CreateTransactionDto {
   @Type(() => InstallmentInfoDto)
   installment: InstallmentInfoDto;
 
-  /* METADADOS BANCÁRIOS */
-  @IsNotEmpty()
   @IsOptional()
-  @IsString()
-  fitId?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsOptional()
-  accountId?: string;
-
-  @IsOptional()
-  @IsString()
-  accountType?: string;
-
-  @IsOptional()
-  @IsString()
-  bankId?: string;
-
-  @IsOptional()
-  @IsString()
-  bankName?: string;
-
-  @IsOptional()
-  @IsString()
-  currency?: string;
+  @ValidateNested()
+  @Type(() => OfxDetailsDto)
+  ofx?: OfxDetailsDto;
 }
