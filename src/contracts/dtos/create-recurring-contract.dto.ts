@@ -22,7 +22,7 @@ export class CreateRecurringContractDto {
   amount: string;
 
   @IsEnum(IntervalEnum)
-  interval: IntervalEnum;
+  installmentInterval: IntervalEnum;
 
   // "2026-01-05"
   @IsString()

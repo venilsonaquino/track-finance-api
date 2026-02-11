@@ -77,7 +77,7 @@ export class RecurringContractModel extends Model<RecurringContractModel> {
     ],
     allowNull: false,
   })
-  interval: IntervalEnum;
+  installmentInterval: IntervalEnum;
   @Column({
     field: 'first_due_date',
     type: DataType.DATEONLY,

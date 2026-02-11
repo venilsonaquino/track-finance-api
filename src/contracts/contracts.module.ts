@@ -6,6 +6,8 @@ import { ContractsService } from './contracts.service';
 import { ContractsController } from './contracts.controller';
 import { RecurringContractModel } from './models/recurring-contract.model';
 import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
+import { WalletModel } from 'src/wallets/models/wallet.model';
+import { CategoryModel } from 'src/categories/models/category.model';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
       InstallmentOccurrenceModel,
       RecurringContractModel,
       RecurringOccurrenceModel,
+      WalletModel,
+      CategoryModel,
     ]),
   ],
   providers: [ContractsService],
