@@ -38,9 +38,9 @@ import { HealthModule } from './health/health.module';
         paranoid: true,
       },
       autoLoadModels: true,
-      synchronize: true,
+      synchronize: process.env.DB_SYNC === 'true'? true : false,
       sync: {
-        alter: true,
+        alter: process.env.DB_SYNC_ALTER === 'true'? true : false,
       },
       logging: false,
       benchmark: false,
