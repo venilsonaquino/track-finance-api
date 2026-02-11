@@ -34,6 +34,7 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
+import { TransactionOfxModel } from 'src/transactions/models/transaction-ofx.model';
 
 @Injectable()
 export class ContractsService {
@@ -53,6 +54,8 @@ export class ContractsService {
     private readonly categoryRepo: typeof CategoryModel,
     @InjectModel(TransactionModel)
     private readonly transactionRepo: typeof TransactionModel,
+    @InjectModel(TransactionOfxModel)
+    private readonly transactionOfxRepo: typeof TransactionOfxModel,
     private readonly walletFacade: WalletFacade,
   ) {}
 
@@ -349,18 +352,17 @@ export class ContractsService {
           amount,
           transactionType: dto.transactionType,
           transactionStatus,
-          fitId: dto.fitId,
-          accountId: dto.accountId,
-          accountType: dto.accountType,
-          bankId: dto.bankId,
-          bankName: dto.bankName,
-          currency: dto.currency,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
       );
+
+      const ofxPayload = this.buildOfxPayload(dto, created.id);
+      if (ofxPayload) {
+        await this.transactionOfxRepo.create(ofxPayload, { transaction });
+      }
 
       await occurrence.update(
         {
@@ -430,18 +432,17 @@ export class ContractsService {
           amount,
           transactionType: dto.transactionType,
           transactionStatus,
-          fitId: dto.fitId,
-          accountId: dto.accountId,
-          accountType: dto.accountType,
-          bankId: dto.bankId,
-          bankName: dto.bankName,
-          currency: dto.currency,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
       );
+
+      const ofxPayload = this.buildOfxPayload(dto, created.id);
+      if (ofxPayload) {
+        await this.transactionOfxRepo.create(ofxPayload, { transaction });
+      }
 
       await occurrence.update(
         {
@@ -468,6 +469,40 @@ export class ContractsService {
         occurrence,
       };
     });
+  }
+
+  private normalizeOfxValue(value?: string | null) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    const trimmed = typeof value === 'string' ? value.trim() : String(value);
+    return trimmed.length === 0 ? null : trimmed;
+  }
+
+  private buildOfxPayload(
+    dto: Partial<PayInstallmentOccurrenceDto>,
+    transactionId: string,
+  ) {
+    const payload: Partial<TransactionOfxModel> = {
+      transactionId,
+      fitId: this.normalizeOfxValue(dto.fitId),
+      accountId: this.normalizeOfxValue(dto.accountId),
+      accountType: this.normalizeOfxValue(dto.accountType),
+      bankId: this.normalizeOfxValue(dto.bankId),
+      bankName: this.normalizeOfxValue(dto.bankName),
+      currency: this.normalizeOfxValue(dto.currency),
+    };
+
+    const hasAnyValue = [
+      payload.fitId,
+      payload.accountId,
+      payload.accountType,
+      payload.bankId,
+      payload.bankName,
+      payload.currency,
+    ].some((value) => value !== null && value !== undefined);
+
+    return hasAnyValue ? payload : null;
   }
 
   private calculateInstallmentAmount(

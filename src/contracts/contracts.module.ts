@@ -9,6 +9,7 @@ import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
 import { WalletModel } from 'src/wallets/models/wallet.model';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { TransactionModel } from 'src/transactions/models/transaction.model';
+import { TransactionOfxModel } from 'src/transactions/models/transaction-ofx.model';
 import { WalletsModule } from 'src/wallets/wallets.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { WalletsModule } from 'src/wallets/wallets.module';
       WalletModel,
       CategoryModel,
       TransactionModel,
+      TransactionOfxModel,
     ]),
     WalletsModule,
   ],

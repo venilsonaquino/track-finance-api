@@ -18,6 +18,7 @@ describe('ContractsService', () => {
   let walletRepo: any;
   let categoryRepo: any;
   let transactionRepo: any;
+  let transactionOfxRepo: any;
   let walletFacade: any;
 
   beforeEach(() => {
@@ -50,6 +51,9 @@ describe('ContractsService', () => {
     transactionRepo = {
       create: jest.fn(),
     };
+    transactionOfxRepo = {
+      create: jest.fn(),
+    };
     walletFacade = {
       adjustWalletBalance: jest.fn(),
     };
@@ -63,6 +67,7 @@ describe('ContractsService', () => {
       walletRepo,
       categoryRepo,
       transactionRepo,
+      transactionOfxRepo,
       walletFacade,
     );
   });

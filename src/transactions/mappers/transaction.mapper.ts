@@ -11,15 +11,15 @@ export class TransactionMapper {
       userId: model.userId,
       categoryId: model.categoryId,
       walletId: model.walletId,
-      fitId: model.fitId,
-      transactionDate: model.transactionDate,
+      fitId: model.ofx?.fitId ?? null,
+      transactionDate: model.ofx?.transactionDate ?? null,
       transactionType: model.transactionType,
       transactionStatus: model.transactionStatus,
-      accountId: model.accountId,
-      accountType: model.accountType,
-      bankId: model.bankId,
-      bankName: model.bankName,
-      currency: model.currency,
+      accountId: model.ofx?.accountId ?? null,
+      accountType: model.ofx?.accountType ?? null,
+      bankId: model.ofx?.bankId ?? null,
+      bankName: model.ofx?.bankName ?? null,
+      currency: model.ofx?.currency ?? null,
     });
 
     if (model.category) {

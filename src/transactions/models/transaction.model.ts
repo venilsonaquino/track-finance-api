@@ -18,6 +18,7 @@ import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
 import { ulid } from 'ulid';
 import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occurrence.model';
+import { TransactionOfxModel } from './transaction-ofx.model';
 
 @Table({
   tableName: 'transactions',
@@ -70,55 +71,40 @@ export class TransactionModel extends Model<TransactionModel> {
   })
   transactionStatus: TransactionStatus;
 
-  @Column({
-    field: 'fit_id',
-    type: DataType.STRING,
-    allowNull: true,
-    unique: true,
-  })
-  fitId: string;
+  @Column(DataType.VIRTUAL)
+  get fitId(): string | null {
+    return this.ofx?.fitId ?? null;
+  }
 
-  @Column({
-    field: 'account_id',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  accountId: string;
+  @Column(DataType.VIRTUAL)
+  get accountId(): string | null {
+    return this.ofx?.accountId ?? null;
+  }
 
-  @Column({
-    field: 'account_type',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  accountType: string;
+  @Column(DataType.VIRTUAL)
+  get accountType(): string | null {
+    return this.ofx?.accountType ?? null;
+  }
 
-  @Column({
-    field: 'bank_id',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  bankId: string;
+  @Column(DataType.VIRTUAL)
+  get bankId(): string | null {
+    return this.ofx?.bankId ?? null;
+  }
 
-  @Column({
-    field: 'bank_name',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  bankName: string;
+  @Column(DataType.VIRTUAL)
+  get bankName(): string | null {
+    return this.ofx?.bankName ?? null;
+  }
 
-  @Column({
-    field: 'currency',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  currency: string;
+  @Column(DataType.VIRTUAL)
+  get currency(): string | null {
+    return this.ofx?.currency ?? null;
+  }
 
-  @Column({
-    field: 'transaction_date',
-    type: DataType.DATEONLY,
-    allowNull: true,
-  })
-  transactionDate: string;
+  @Column(DataType.VIRTUAL)
+  get transactionDate(): string | null {
+    return this.ofx?.transactionDate ?? null;
+  }
 
   @ForeignKey(() => UserModel)
   @Column({
@@ -158,4 +144,10 @@ export class TransactionModel extends Model<TransactionModel> {
     as: 'installmentOccurrence',
   })
   installmentOccurrence?: InstallmentOccurrenceModel;
+
+  @HasOne(() => TransactionOfxModel, {
+    foreignKey: 'transactionId',
+    as: 'ofx',
+  })
+  ofx?: TransactionOfxModel;
 }
