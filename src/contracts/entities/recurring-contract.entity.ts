@@ -15,7 +15,7 @@ export class RecurringContractEntity {
   description: string;
   amount: string;
 
-  interval: IntervalEnum;
+  installmentInterval: IntervalEnum;
   firstDueDate: string;
 
   endsAt?: string | null;

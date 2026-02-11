@@ -9,8 +9,8 @@ export class InstallmentContractEntity {
   walletId: string;
   categoryId: string;
   description?: string;
-  totalAmount: number;
-  installmentNumber: number;
+  totalAmount: string;
+  installmentsCount: number;
   installmentInterval: IntervalEnum;
   firstDueDate: string;
   status: ContractStatusEnum;
@@ -23,8 +23,8 @@ export class InstallmentContractEntity {
       walletId: string;
       categoryId: string;
       description?: string;
-      totalAmount: number;
-      installmentNumber: number;
+      totalAmount: string;
+      installmentsCount: number;
       installmentInterval: IntervalEnum;
       firstDueDate: string;
       status: ContractStatusEnum;
@@ -37,7 +37,7 @@ export class InstallmentContractEntity {
     this.categoryId = params.categoryId;
     this.description = params.description;
     this.totalAmount = params.totalAmount;
-    this.installmentNumber = params.installmentNumber;
+    this.installmentsCount = params.installmentsCount;
     this.installmentInterval = params.installmentInterval;
     this.firstDueDate = params.firstDueDate;
     this.status = params.status || ContractStatusEnum.Active;

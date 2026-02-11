@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WalletsService } from '../wallets.service';
 import { CreateWalletDto } from '../dto/create-wallet.dto';
-import { WalletEntity } from '../entities/wallet.entity';
+import { WalletResponseDto } from '../dto/wallet-response.dto';
 
 @Injectable()
 export class WalletFacade {
@@ -11,7 +11,7 @@ export class WalletFacade {
     return this.walletsService.findBalanceCurrent(userId);
   }
 
-  async createWallet(userId: string): Promise<WalletEntity> {
+  async createWallet(userId: string): Promise<WalletResponseDto> {
     const walletDto = new CreateWalletDto();
 
     walletDto.name = 'MainWallet';
@@ -27,7 +27,7 @@ export class WalletFacade {
     walletId: string,
     userId: string,
     amount: number,
-  ): Promise<WalletEntity> {
+  ): Promise<WalletResponseDto> {
     return this.walletsService.adjustBalance(walletId, userId, amount);
   }
 }
