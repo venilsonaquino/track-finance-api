@@ -657,8 +657,8 @@ export class TransactionsService {
       date: occurrence.dueDate,
       description,
       amount: Number(occurrence.amount),
-      transactionType: null,
-      transactionStatus: null,
+      transactionType: contract?.transactionType ?? null,
+      transactionStatus: contract?.transactionStatus ?? null,
       source: 'installment',
       category: contract?.category
         ? { id: contract.category.id, name: contract.category.name }
@@ -686,8 +686,8 @@ export class TransactionsService {
       date: occurrence.dueDate,
       description,
       amount: Number(occurrence.amount),
-      transactionType: null,
-      transactionStatus: null,
+      transactionType: contract.transactionType ?? null,
+      transactionStatus: contract.transactionStatus ?? null,
       source: 'recurring',
       category: contract.category
         ? { id: contract.category.id, name: contract.category.name }

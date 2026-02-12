@@ -18,6 +18,8 @@ import { ContractStatusEnum } from '../enums/contract-status.enum';
 import { IntervalEnum } from '../enums/interval.enum';
 import { ulid } from 'ulid';
 import { InstallmentOccurrenceModel } from './installment-occurrence.model';
+import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 
 @Table({
   tableName: 'installment_contracts',
@@ -104,6 +106,23 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
     defaultValue: ContractStatusEnum.Active,
   })
   status: ContractStatusEnum;
+
+  @Column({
+    field: 'transaction_type',
+    type: DataType.ENUM,
+    values: [TransactionType.Income, TransactionType.Expense],
+    allowNull: true,
+  })
+  transactionType?: TransactionType | null;
+
+  @Column({
+    field: 'transaction_status',
+    type: DataType.ENUM,
+    values: [TransactionStatus.Posted, TransactionStatus.Reversed],
+    allowNull: true,
+    defaultValue: TransactionStatus.Posted,
+  })
+  transactionStatus?: TransactionStatus | null;
 
   @BelongsTo(() => UserModel)
   user: UserEntity;

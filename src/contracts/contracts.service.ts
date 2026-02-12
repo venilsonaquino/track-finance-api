@@ -90,6 +90,8 @@ export class ContractsService {
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
           status: ContractStatusEnum.Active,
+          transactionType: dto.transactionType ?? null,
+          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
         },
         { transaction: t },
       );
@@ -150,6 +152,8 @@ export class ContractsService {
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
           status: ContractStatusEnum.Active,
+          transactionType: dto.transactionType ?? null,
+          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
         },
         { transaction },
       );
