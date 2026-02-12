@@ -4,6 +4,7 @@ export class RecurringOccurrenceItemDto {
   amount: string;
   status: 'PAID' | 'FUTURE';
   transactionId: string | null;
+  transactionStatus: string | null;
 }
 
 export class GetRecurringContractDetailsResponseDto {

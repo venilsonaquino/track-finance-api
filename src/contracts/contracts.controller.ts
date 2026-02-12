@@ -5,7 +5,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CreateInstallmentContractDto } from './dtos/create-Installment-contract.dto';
@@ -52,7 +51,7 @@ export class ContractsController {
     );
   }
 
-  @Post('installments/:contractId/occurrences/:installmentIndex/pay')
+  @Patch('installments/:contractId/occurrences/:installmentIndex/pay')
   async payInstallment(
     @Param('contractId') contractId: string,
     @Param('installmentIndex') installmentIndex: string,
@@ -67,7 +66,7 @@ export class ContractsController {
     );
   }
 
-  @Post('recurring/:contractId/occurrences/:dueDate/pay')
+  @Patch('recurring/:contractId/occurrences/:dueDate/pay')
   async payRecurring(
     @Param('contractId') contractId: string,
     @Param('dueDate') dueDate: string,

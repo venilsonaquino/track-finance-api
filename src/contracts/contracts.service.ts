@@ -34,7 +34,6 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
-import { TransactionOfxService } from 'src/transactions/transaction-ofx.service';
 import { GetInstallmentContractDetailsResponseDto } from './dtos/get-installment-contract-details-response.dto';
 import { GetRecurringContractDetailsResponseDto } from './dtos/get-recurring-contract-details-response.dto';
 import { createDueDateBuilder } from 'src/common/utils/create-due-date-builder';
@@ -58,7 +57,6 @@ export class ContractsService {
     @InjectModel(TransactionModel)
     private readonly transactionRepo: typeof TransactionModel,
     private readonly walletFacade: WalletFacade,
-    private readonly transactionOfxService: TransactionOfxService,
   ) {}
 
   async createInstallmentContract(
@@ -212,6 +210,17 @@ export class ContractsService {
     const overrides = overridesModels.map((m) => m.get({ plain: true }));
 
     const items = OccurrenceProjection.project(generated, overrides);
+    const transactionStatusById = await this.getTransactionStatusByIds(
+      items.map((item) => item.transactionId).filter(Boolean) as string[],
+      userId,
+    );
+
+    const itemsWithTransactionStatus = items.map((item) => ({
+      ...item,
+      transactionStatus: item.transactionId
+        ? (transactionStatusById.get(item.transactionId) ?? null)
+        : null,
+    }));
 
     return {
       contractId: contract.id,
@@ -219,7 +228,7 @@ export class ContractsService {
         from: query.from,
         to: query.to,
       },
-      items,
+      items: itemsWithTransactionStatus,
     };
   }
 
@@ -425,6 +434,10 @@ export class ContractsService {
     const paidAll = occurrences.filter(
       (occ) => occ.status === OccurrenceStatusEnum.Posted || !!occ.transactionId,
     );
+    const paidTransactionStatusById = await this.getTransactionStatusByIds(
+      paidAll.map((occ) => occ.transactionId).filter(Boolean) as string[],
+      userId,
+    );
 
     const paidRecent = [...paidAll]
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
@@ -436,6 +449,9 @@ export class ContractsService {
         amount: String(occ.amount),
         status: 'PAID' as const,
         transactionId: occ.transactionId ?? null,
+        transactionStatus: occ.transactionId
+          ? (paidTransactionStatusById.get(occ.transactionId) ?? null)
+          : null,
       }));
 
     const upcomingGenerated = this.generateUpcomingRecurringOccurrences(contract, 3);
@@ -479,6 +495,7 @@ export class ContractsService {
             amount: String(occ.amount),
             status: 'FUTURE' as const,
             transactionId: null,
+            transactionStatus: null,
           })),
         ],
         paidLimit: 3,
@@ -515,16 +532,19 @@ export class ContractsService {
     if (occurrence.transactionId) {
       throw new BadRequestException('Occurrence already paid.');
     }
+    if (!contract.transactionType) {
+      throw new BadRequestException(
+        'Contract transactionType is required to mark occurrence as paid.',
+      );
+    }
 
     const amount = String(occurrence.amount);
-    const description =
-      dto.description ??
-      (contract.description
-        ? `${contract.description} • Parcela ${installmentIndex}/${contract.installmentsCount}`
-        : `Parcela ${installmentIndex}/${contract.installmentsCount}`);
+    const description = contract.description
+      ? `${contract.description} • Parcela ${installmentIndex}/${contract.installmentsCount}`
+      : `Parcela ${installmentIndex}/${contract.installmentsCount}`;
     const depositedDate = dto.depositedDate ?? occurrence.dueDate;
     const transactionStatus =
-      dto.transactionStatus ?? TransactionStatus.Posted;
+      contract.transactionStatus ?? TransactionStatus.Posted;
 
     return this.sequelize.transaction(async (transaction) => {
       const created = await this.transactionRepo.create(
@@ -532,19 +552,13 @@ export class ContractsService {
           depositedDate,
           description,
           amount,
-          transactionType: dto.transactionType,
+          transactionType: contract.transactionType,
           transactionStatus,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
-      );
-
-      await this.transactionOfxService.syncDetails(
-        created.id,
-        this.buildOfxPayload(dto),
-        transaction,
       );
 
       await occurrence.update(
@@ -555,17 +569,11 @@ export class ContractsService {
         { transaction },
       );
 
-      if (dto.affectBalance ?? true) {
-        const delta = TransactionEntity.resolveBalanceDelta(
-          Number(created.amount),
-          created.transactionType,
-        );
-        await this.walletFacade.adjustWalletBalance(
-          contract.walletId,
-          userId,
-          delta,
-        );
-      }
+      const delta = TransactionEntity.resolveBalanceDelta(
+        Number(created.amount),
+        created.transactionType,
+      );
+      await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
 
       return {
         transaction: created,
@@ -597,15 +605,17 @@ export class ContractsService {
     if (occurrence.transactionId) {
       throw new BadRequestException('Occurrence already paid.');
     }
+    if (!contract.transactionType) {
+      throw new BadRequestException(
+        'Contract transactionType is required to mark occurrence as paid.',
+      );
+    }
 
     const amount = String(occurrence.amount);
-    const description =
-      dto.description ??
-      contract.description ??
-      `Recorrencia ${dueDate}`;
+    const description = contract.description ?? `Recorrencia ${dueDate}`;
     const depositedDate = dto.depositedDate ?? occurrence.dueDate;
     const transactionStatus =
-      dto.transactionStatus ?? TransactionStatus.Posted;
+      contract.transactionStatus ?? TransactionStatus.Posted;
 
     return this.sequelize.transaction(async (transaction) => {
       const created = await this.transactionRepo.create(
@@ -613,19 +623,13 @@ export class ContractsService {
           depositedDate,
           description,
           amount,
-          transactionType: dto.transactionType,
+          transactionType: contract.transactionType,
           transactionStatus,
           userId,
           categoryId: contract.categoryId,
           walletId: contract.walletId,
         },
         { transaction },
-      );
-
-      await this.transactionOfxService.syncDetails(
-        created.id,
-        this.buildOfxPayload(dto),
-        transaction,
       );
 
       await occurrence.update(
@@ -636,36 +640,17 @@ export class ContractsService {
         { transaction },
       );
 
-      if (dto.affectBalance ?? true) {
-        const delta = TransactionEntity.resolveBalanceDelta(
-          Number(created.amount),
-          created.transactionType,
-        );
-        await this.walletFacade.adjustWalletBalance(
-          contract.walletId,
-          userId,
-          delta,
-        );
-      }
+      const delta = TransactionEntity.resolveBalanceDelta(
+        Number(created.amount),
+        created.transactionType,
+      );
+      await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
 
       return {
         transaction: created,
         occurrence,
       };
     });
-  }
-
-  private buildOfxPayload(dto: Partial<PayInstallmentOccurrenceDto>) {
-    return {
-      ofx: {
-        fitId: dto.fitId,
-        accountId: dto.accountId,
-        accountType: dto.accountType,
-        bankId: dto.bankId,
-        bankName: dto.bankName,
-        currency: dto.currency,
-      },
-    } as any;
   }
 
   private calculateInstallmentAmount(
@@ -757,5 +742,30 @@ export class ContractsService {
     }
 
     return items;
+  }
+
+  private async getTransactionStatusByIds(
+    transactionIds: string[],
+    userId: string,
+  ): Promise<Map<string, TransactionStatus>> {
+    const uniqueIds = Array.from(new Set(transactionIds.filter(Boolean)));
+    if (uniqueIds.length === 0) {
+      return new Map<string, TransactionStatus>();
+    }
+
+    const transactions = await this.transactionRepo.findAll({
+      where: {
+        id: { [Op.in]: uniqueIds },
+        userId,
+      },
+      attributes: ['id', 'transactionStatus'],
+    });
+
+    return new Map(
+      transactions.map((transaction) => [
+        transaction.id,
+        transaction.transactionStatus,
+      ]),
+    );
   }
 }

@@ -19,7 +19,6 @@ describe('ContractsService', () => {
   let categoryRepo: any;
   let transactionRepo: any;
   let walletFacade: any;
-  let transactionOfxService: any;
 
   beforeEach(() => {
     sequelize = {
@@ -50,14 +49,11 @@ describe('ContractsService', () => {
     };
     transactionRepo = {
       create: jest.fn(),
+      findAll: jest.fn(async () => []),
     };
     walletFacade = {
       adjustWalletBalance: jest.fn(),
     };
-    transactionOfxService = {
-      syncDetails: jest.fn(),
-    };
-
     service = new ContractsService(
       sequelize,
       contractRepo,
@@ -68,7 +64,6 @@ describe('ContractsService', () => {
       categoryRepo,
       transactionRepo,
       walletFacade,
-      transactionOfxService,
     );
   });
 
@@ -277,6 +272,8 @@ describe('ContractsService', () => {
       walletId: 'wallet-1',
       installmentsCount: 3,
       description: 'Notebook',
+      transactionType: 'EXPENSE',
+      transactionStatus: 'POSTED',
     });
     occurrenceRepo.findOne.mockResolvedValueOnce({
       id: 'occ-1',
@@ -296,7 +293,7 @@ describe('ContractsService', () => {
     const result = await service.payInstallmentOccurrence(
       'contract-1',
       1,
-      { transactionType: 'EXPENSE' } as any,
+      {} as any,
       'user-1',
     );
 
@@ -312,6 +309,8 @@ describe('ContractsService', () => {
       categoryId: 'cat-1',
       walletId: 'wallet-1',
       description: 'Assinatura',
+      transactionType: 'EXPENSE',
+      transactionStatus: 'POSTED',
     });
     recurringOccurrenceRepo.findOne.mockResolvedValueOnce({
       id: 'roc-1',
@@ -330,13 +329,38 @@ describe('ContractsService', () => {
     const result = await service.payRecurringOccurrence(
       'rec-1',
       '2026-02-15',
-      { transactionType: 'EXPENSE' } as any,
+      {} as any,
       'user-1',
     );
 
     expect(transactionRepo.create).toHaveBeenCalledTimes(1);
     expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
     expect(result.transaction.id).toBe('tx-2');
+  });
+
+  it('throws BadRequestException when paying installment without contract transactionType', async () => {
+    contractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      installmentsCount: 3,
+      description: 'Notebook',
+      transactionType: null,
+    });
+    occurrenceRepo.findOne.mockResolvedValueOnce({
+      id: 'occ-1',
+      contractId: 'contract-1',
+      installmentIndex: 1,
+      dueDate: '2026-02-10',
+      amount: '100.00',
+      transactionId: null,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    });
+
+    await expect(
+      service.payInstallmentOccurrence('contract-1', 1, {} as any, 'user-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('returns generated and override occurrences for getContractOccurrences', async () => {
@@ -369,6 +393,41 @@ describe('ContractsService', () => {
     expect(recurringOccurrenceRepo.findAll).toHaveBeenCalledTimes(1);
     expect(result.contractId).toBe('contract-1');
     expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items[0]).toHaveProperty('transactionStatus');
+  });
+
+  it('returns transactionStatus for occurrences linked to transactions', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      userId: 'user-1',
+      status: ContractStatusEnum.Active,
+      firstDueDate: '2026-01-01',
+      installmentInterval: IntervalEnum.Monthly,
+      amount: '15.00',
+    });
+    recurringOccurrenceRepo.findAll.mockResolvedValueOnce([
+      {
+        get: () => ({
+          contractId: 'contract-1',
+          dueDate: '2026-02-01',
+          amount: '10.00',
+          status: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-1',
+        }),
+      },
+    ]);
+    transactionRepo.findAll.mockResolvedValueOnce([
+      { id: 'tx-1', transactionStatus: 'REVERSED' },
+    ]);
+
+    const result = await service.getContractOccurrences(
+      'contract-1',
+      { from: '2026-01-01', to: '2026-03-01' } as any,
+      'user-1',
+    );
+
+    const linked = result.items.find((item) => item.transactionId === 'tx-1');
+    expect(linked?.transactionStatus).toBe('REVERSED');
   });
 
   it('returns installment contract details for dashboard view', async () => {
@@ -443,6 +502,11 @@ describe('ContractsService', () => {
   });
 
   it('returns recurring contract details in semantic payload for screen', async () => {
+    transactionRepo.findAll.mockResolvedValueOnce([
+      { id: 'tx-1', transactionStatus: 'POSTED' },
+      { id: 'tx-2', transactionStatus: 'POSTED' },
+    ]);
+
     recurringContractRepo.findOne.mockResolvedValueOnce({
       id: 'rec-1',
       userId: 'user-1',
@@ -490,6 +554,7 @@ describe('ContractsService', () => {
     expect(result.recurringInfo.createdAt).toBe('2026-01-10T00:00:00.000Z');
     expect(result.occurrenceHistory.items).toHaveLength(5);
     expect(result.occurrenceHistory.items[0].status).toBe('PAID');
+    expect(result.occurrenceHistory.items[0].transactionStatus).toBe('POSTED');
     expect(result.occurrenceHistory.items[4].status).toBe('FUTURE');
     expect(result.occurrenceHistory.paidLimit).toBe(3);
     expect(result.occurrenceHistory.futureLimit).toBe(3);
