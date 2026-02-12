@@ -314,17 +314,22 @@ describe('ContractsService', () => {
       categoryId: 'cat-1',
       walletId: 'wallet-1',
       description: 'Assinatura',
+      firstDueDate: '2026-01-15',
+      installmentInterval: IntervalEnum.Monthly,
+      status: ContractStatusEnum.Active,
       transactionType: 'EXPENSE',
       transactionStatus: 'POSTED',
     });
-    recurringOccurrenceRepo.findOne.mockResolvedValueOnce({
+    const existingOccurrence = {
       id: 'roc-1',
       contractId: 'rec-1',
       dueDate: '2026-02-15',
       amount: '50.00',
+      status: OccurrenceStatusEnum.Scheduled,
       transactionId: null,
       update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
-    });
+    };
+    recurringOccurrenceRepo.findOne.mockResolvedValueOnce(existingOccurrence);
     transactionRepo.create.mockResolvedValueOnce({
       id: 'tx-2',
       amount: '50.00',
@@ -339,8 +344,72 @@ describe('ContractsService', () => {
     );
 
     expect(transactionRepo.create).toHaveBeenCalledTimes(1);
+    expect(existingOccurrence.update).toHaveBeenCalledTimes(1);
+    expect(recurringOccurrenceRepo.create).not.toHaveBeenCalled();
     expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
     expect(result.transaction.id).toBe('tx-2');
+  });
+
+  it('pays recurring occurrence creating it on demand when it does not exist', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'rec-1',
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      description: 'Assinatura',
+      amount: '50.00',
+      firstDueDate: '2026-01-15',
+      installmentInterval: IntervalEnum.Monthly,
+      status: ContractStatusEnum.Active,
+      transactionType: 'EXPENSE',
+      transactionStatus: 'POSTED',
+    });
+    recurringOccurrenceRepo.findOne.mockResolvedValueOnce(null);
+    recurringOccurrenceRepo.create.mockResolvedValueOnce({
+      id: 'roc-2',
+      contractId: 'rec-1',
+      dueDate: '2026-02-15',
+      amount: '50.00',
+      status: OccurrenceStatusEnum.Posted,
+      transactionId: 'tx-3',
+    });
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-3',
+      amount: '50.00',
+      transactionType: 'EXPENSE',
+    });
+
+    const result = await service.payRecurringOccurrence(
+      'rec-1',
+      '2026-02-15',
+      {} as any,
+      'user-1',
+    );
+
+    expect(transactionRepo.create).toHaveBeenCalledTimes(1);
+    expect(recurringOccurrenceRepo.create).toHaveBeenCalledTimes(1);
+    expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
+    expect(result.transaction.id).toBe('tx-3');
+  });
+
+  it('throws BadRequestException when paying recurring occurrence with invalid schedule dueDate', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'rec-1',
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      description: 'Assinatura',
+      amount: '50.00',
+      firstDueDate: '2026-01-15',
+      installmentInterval: IntervalEnum.Monthly,
+      status: ContractStatusEnum.Active,
+      transactionType: 'EXPENSE',
+      transactionStatus: 'POSTED',
+    });
+
+    await expect(
+      service.payRecurringOccurrence('rec-1', '2026-02-20', {} as any, 'user-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('throws BadRequestException when paying installment without contract transactionType', async () => {

@@ -606,22 +606,47 @@ export class ContractsService {
     dto: PayInstallmentOccurrenceDto,
     userId: string,
   ) {
+    const dueDateObj = parseIsoDateOnly(dueDate);
+    if (!dueDateObj) {
+      throw new BadRequestException('Invalid dueDate. Use YYYY-MM-DD.');
+    }
+
     const contract = await this.recurringContractRepo.findOne({
       where: { id: contractId, userId },
     });
     if (!contract) {
       throw new NotFoundException('Contract not found.');
     }
-
-    const occurrence = await this.recurringOccurrenceRepo.findOne({
-      where: { contractId, dueDate },
-    });
-    if (!occurrence) {
-      throw new NotFoundException('Occurrence not found.');
+    if (contract.status !== ContractStatusEnum.Active) {
+      throw new BadRequestException('Only active contracts can be paid.');
+    }
+    if (
+      !isDueDateOnSchedule(
+        contract.firstDueDate,
+        contract.installmentInterval,
+        dueDate,
+      )
+    ) {
+      throw new BadRequestException(
+        'dueDate is not valid for this contract schedule.',
+      );
     }
 
-    if (occurrence.transactionId) {
+    const existingOccurrence = await this.recurringOccurrenceRepo.findOne({
+      where: { contractId, dueDate },
+    });
+
+    if (
+      existingOccurrence?.status === OccurrenceStatusEnum.Posted ||
+      existingOccurrence?.transactionId
+    ) {
       throw new BadRequestException('Occurrence already paid.');
+    }
+    if (
+      existingOccurrence?.status === OccurrenceStatusEnum.Cancelled ||
+      existingOccurrence?.status === OccurrenceStatusEnum.Skipped
+    ) {
+      throw new BadRequestException('Occurrence is not payable.');
     }
     if (!contract.transactionType) {
       throw new BadRequestException(
@@ -629,9 +654,9 @@ export class ContractsService {
       );
     }
 
-    const amount = String(occurrence.amount);
+    const amount = String(existingOccurrence?.amount ?? contract.amount);
     const description = contract.description ?? `Recorrencia ${dueDate}`;
-    const depositedDate = dto.depositedDate ?? occurrence.dueDate;
+    const depositedDate = dto.depositedDate ?? dueDate;
     const transactionStatus =
       contract.transactionStatus ?? TransactionStatus.Posted;
 
@@ -650,13 +675,25 @@ export class ContractsService {
         { transaction },
       );
 
-      await occurrence.update(
-        {
-          status: OccurrenceStatusEnum.Posted,
-          transactionId: created.id,
-        },
-        { transaction },
-      );
+      const occurrence = existingOccurrence
+        ? await existingOccurrence.update(
+            {
+              amount,
+              status: OccurrenceStatusEnum.Posted,
+              transactionId: created.id,
+            },
+            { transaction },
+          )
+        : await this.recurringOccurrenceRepo.create(
+            {
+              contractId,
+              dueDate,
+              amount,
+              status: OccurrenceStatusEnum.Posted,
+              transactionId: created.id,
+            },
+            { transaction },
+          );
 
       const delta = TransactionEntity.resolveBalanceDelta(
         Number(created.amount),
