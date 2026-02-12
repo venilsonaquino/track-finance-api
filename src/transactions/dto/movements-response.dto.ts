@@ -1,7 +1,17 @@
 import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
+import { OccurrenceStatusEnum } from 'src/contracts/enums/installment-occurrence-status.enum';
 
 export type MovementSource = 'transaction' | 'installment' | 'recurring';
+export type MovementContractType = 'INSTALLMENT' | 'RECURRING';
+
+export class MovementActionsDto {
+  canMarkAsPaid: boolean;
+  canReverse: boolean;
+  canEditDueDate: boolean;
+  canSkip: boolean;
+  canViewContract: boolean;
+}
 
 export class MovementCategoryDto {
   id: string;
@@ -28,6 +38,9 @@ export class MovementItemDto {
   occurrenceId?: string;
   installmentIndex?: number;
   dueDate?: string;
+  contractType?: MovementContractType;
+  occurrenceStatus?: OccurrenceStatusEnum | null;
+  actions: MovementActionsDto;
 }
 
 export class MovementsMonthlyResponseDto {

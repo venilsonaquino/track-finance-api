@@ -609,6 +609,12 @@ export class TransactionsService {
       wallet: transaction.wallet
         ? { id: transaction.wallet.id, name: transaction.wallet.name }
         : undefined,
+      actions: this.resolveMovementActions({
+        source: 'transaction',
+        occurrenceStatus: null,
+        transactionStatus: transaction.transactionStatus,
+        hasContract: false,
+      }),
     };
   }
 
@@ -620,6 +626,12 @@ export class TransactionsService {
     if (!transaction) {
       return null;
     }
+
+    const rawStatus =
+      source === 'installment'
+        ? (occurrence as InstallmentOccurrenceModel).installmentStatus
+        : (occurrence as RecurringOccurrenceModel).status;
+    const occurrenceStatus = this.resolveOccurrenceStatus(rawStatus);
 
     return {
       id: occurrence.id,
@@ -640,6 +652,14 @@ export class TransactionsService {
       occurrenceId: occurrence.id,
       installmentIndex: (occurrence as any).installmentIndex,
       dueDate: occurrence.dueDate,
+      contractType: source === 'installment' ? 'INSTALLMENT' : 'RECURRING',
+      occurrenceStatus,
+      actions: this.resolveMovementActions({
+        source,
+        occurrenceStatus,
+        transactionStatus: transaction.transactionStatus,
+        hasContract: true,
+      }),
     };
   }
 
@@ -651,6 +671,10 @@ export class TransactionsService {
       ? `${contract.description} • Parcela ${occurrence.installmentIndex}/${contract.installmentsCount}`
       : `Parcela ${occurrence.installmentIndex}/${contract?.installmentsCount ?? ''}`.trim();
 
+    const occurrenceStatus = this.resolveOccurrenceStatus(
+      occurrence.installmentStatus,
+    );
+
     return {
       id: occurrence.id,
       transactionId: null,
@@ -658,7 +682,7 @@ export class TransactionsService {
       description,
       amount: Number(occurrence.amount),
       transactionType: contract?.transactionType ?? null,
-      transactionStatus: contract?.transactionStatus ?? null,
+      transactionStatus: null,
       source: 'installment',
       category: contract?.category
         ? { id: contract.category.id, name: contract.category.name }
@@ -670,6 +694,14 @@ export class TransactionsService {
       occurrenceId: occurrence.id,
       installmentIndex: occurrence.installmentIndex,
       dueDate: occurrence.dueDate,
+      contractType: 'INSTALLMENT',
+      occurrenceStatus,
+      actions: this.resolveMovementActions({
+        source: 'installment',
+        occurrenceStatus,
+        transactionStatus: null,
+        hasContract: true,
+      }),
     };
   }
 
@@ -680,6 +712,10 @@ export class TransactionsService {
     const description =
       contract.description ?? `Recorrencia ${occurrence.dueDate}`;
 
+    const occurrenceStatus = this.resolveOccurrenceStatus(
+      occurrence.status,
+    );
+
     return {
       id: `recurring:${contract.id}:${occurrence.dueDate}`,
       transactionId: occurrence.transactionId ?? null,
@@ -687,7 +723,7 @@ export class TransactionsService {
       description,
       amount: Number(occurrence.amount),
       transactionType: contract.transactionType ?? null,
-      transactionStatus: contract.transactionStatus ?? null,
+      transactionStatus: null,
       source: 'recurring',
       category: contract.category
         ? { id: contract.category.id, name: contract.category.name }
@@ -697,6 +733,45 @@ export class TransactionsService {
         : undefined,
       contractId: contract.id,
       dueDate: occurrence.dueDate,
+      contractType: 'RECURRING',
+      occurrenceStatus,
+      actions: this.resolveMovementActions({
+        source: 'recurring',
+        occurrenceStatus,
+        transactionStatus: null,
+        hasContract: true,
+      }),
+    };
+  }
+
+  private resolveOccurrenceStatus(
+    occurrenceStatus: OccurrenceStatusEnum | null | undefined,
+  ): OccurrenceStatusEnum {
+    return occurrenceStatus ?? OccurrenceStatusEnum.Scheduled;
+  }
+
+  private resolveMovementActions(params: {
+    source: MovementSource;
+    occurrenceStatus: OccurrenceStatusEnum | null;
+    transactionStatus?: TransactionStatus | null;
+    hasContract: boolean;
+  }) {
+    const isFuture = params.occurrenceStatus === OccurrenceStatusEnum.Scheduled;
+    const isPosted = params.occurrenceStatus === OccurrenceStatusEnum.Posted;
+    const isRecurring = params.source === 'recurring';
+
+    return {
+      canMarkAsPaid:
+        params.hasContract &&
+        (params.source === 'installment' || params.source === 'recurring') &&
+        isFuture,
+      canReverse:
+        !!params.transactionStatus &&
+        params.transactionStatus === TransactionStatus.Posted &&
+        (params.hasContract ? isPosted : true),
+      canEditDueDate: false,
+      canSkip: params.hasContract && isRecurring && isFuture,
+      canViewContract: params.hasContract,
     };
   }
 

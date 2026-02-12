@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { IntervalEnum } from '../enums/interval.enum';
 import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
@@ -34,11 +34,11 @@ export class CreateRecurringContractDto {
   })
   firstDueDate: string;
 
-  @IsOptional()
+  @IsDefined()
   @IsEnum(TransactionType, {
     message: 'transactionType must be one of: INCOME, EXPENSE',
   })
-  transactionType?: TransactionType;
+  transactionType: TransactionType;
 
   @IsOptional()
   @IsEnum(TransactionStatus, {

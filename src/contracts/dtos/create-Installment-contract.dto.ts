@@ -1,4 +1,5 @@
 import {
+  IsDefined,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -47,11 +48,11 @@ export class CreateInstallmentContractDto {
   @IsOptional()
   generateOccurrences?: boolean; // default true
 
-  @IsOptional()
+  @IsDefined()
   @IsEnum(TransactionType, {
     message: 'transactionType must be one of: INCOME, EXPENSE',
   })
-  transactionType?: TransactionType;
+  transactionType: TransactionType;
 
   @IsOptional()
   @IsEnum(TransactionStatus, {

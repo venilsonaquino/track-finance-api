@@ -86,6 +86,7 @@ describe('ContractsService', () => {
         installmentInterval: IntervalEnum.Monthly,
         firstDueDate: '2026-01-01',
         generateOccurrences: true,
+        transactionType: 'EXPENSE',
       } as any,
       'user-1',
     );
@@ -111,6 +112,7 @@ describe('ContractsService', () => {
         installmentInterval: IntervalEnum.Monthly,
         firstDueDate: '2026-01-01',
         generateOccurrences: false,
+        transactionType: 'EXPENSE',
       } as any,
       'user-1',
     );
@@ -132,6 +134,7 @@ describe('ContractsService', () => {
           installmentsCount: 2,
           installmentInterval: IntervalEnum.Monthly,
           firstDueDate: '2026-01-01',
+          transactionType: 'EXPENSE',
         } as any,
         'user-1',
       ),
@@ -149,6 +152,7 @@ describe('ContractsService', () => {
       amount: '10.00',
       installmentInterval: IntervalEnum.Monthly,
       firstDueDate: '2026-01-01',
+      transactionType: 'EXPENSE',
     } as any);
 
     expect(recurringContractRepo.create).toHaveBeenCalledTimes(1);
@@ -166,6 +170,7 @@ describe('ContractsService', () => {
         amount: '10.00',
         installmentInterval: IntervalEnum.Monthly,
         firstDueDate: '2026-01-01',
+        transactionType: 'EXPENSE',
       } as any),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
