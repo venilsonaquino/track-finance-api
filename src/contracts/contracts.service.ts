@@ -35,6 +35,7 @@ import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.d
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 import { TransactionOfxService } from 'src/transactions/transaction-ofx.service';
+import { GetInstallmentContractDetailsResponseDto } from './dtos/get-installment-contract-details-response.dto';
 
 @Injectable()
 export class ContractsService {
@@ -314,6 +315,90 @@ export class ContractsService {
     return contract;
   }
 
+  async getInstallmentContractDetails(
+    contractId: string,
+    userId: string,
+  ): Promise<GetInstallmentContractDetailsResponseDto> {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+      include: [
+        { model: CategoryModel, as: 'category' },
+        { model: WalletModel, as: 'wallet' },
+        { model: InstallmentOccurrenceModel, as: 'occurrences' },
+      ],
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+
+    const occurrences = [...(contract.occurrences ?? [])].sort((a, b) =>
+      a.dueDate.localeCompare(b.dueDate),
+    );
+
+    const paidCount = occurrences.filter(
+      (occ) =>
+        occ.installmentStatus === OccurrenceStatusEnum.Posted || !!occ.transactionId,
+    ).length;
+    const totalCount = contract.installmentsCount ?? occurrences.length;
+    const futureCount = Math.max(totalCount - paidCount, 0);
+    const percent = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
+
+    const installmentAmount = occurrences[0]?.amount ?? this.calculateInstallmentAmount(
+      contract.totalAmount,
+      contract.installmentsCount,
+    );
+
+    const nextOccurrence = occurrences.find(
+      (occ) => occ.installmentStatus !== OccurrenceStatusEnum.Posted && !occ.transactionId,
+    );
+    const nextInvoice = nextOccurrence
+      ? this.formatMonthYear(nextOccurrence.dueDate)
+      : null;
+
+    return {
+      contractId: contract.id,
+      header: {
+        title: contract.description ?? null,
+        subtitle: `Parcelamento no Cartao ${contract.wallet?.name ?? ''}`.trim(),
+        installmentLabel: `${contract.installmentsCount}x de R$ ${this.formatBrlAmount(installmentAmount)}`,
+        totalLabel: `R$ ${this.formatBrlAmount(contract.totalAmount)}`,
+        paidCount,
+        futureCount,
+        progress: {
+          paid: paidCount,
+          total: totalCount,
+          percent,
+        },
+      },
+      contractInfo: {
+        categoryName: contract.category?.name ?? null,
+        createdAt: contract.createdAt
+          ? new Date(contract.createdAt).toISOString()
+          : null,
+        billingDayLabel: `Todo dia ${Number(contract.firstDueDate.slice(8, 10))}`,
+        account: {
+          walletId: contract.walletId,
+          walletName: contract.wallet?.name ?? null,
+          closingDay: null,
+          dueDay: null,
+          nextInvoice,
+        },
+      },
+      installments: occurrences.map((occ) => ({
+        id: occ.id,
+        installmentIndex: occ.installmentIndex,
+        dueDate: occ.dueDate,
+        amount: this.formatBrlAmount(occ.amount),
+        status:
+          occ.installmentStatus === OccurrenceStatusEnum.Posted || !!occ.transactionId
+            ? 'PAID'
+            : 'FUTURE',
+        transactionId: occ.transactionId ?? null,
+      })),
+    };
+  }
+
   async payInstallmentOccurrence(
     contractId: string,
     installmentIndex: number,
@@ -510,5 +595,21 @@ export class ContractsService {
     const intPart = Math.floor(cents / 100);
     const decPart = String(cents % 100).padStart(2, '0');
     return `${intPart}.${decPart}`;
+  }
+
+  private formatBrlAmount(value: string): string {
+    return Number(value).toFixed(2).replace('.', ',');
+  }
+
+  private formatMonthYear(date: string): string {
+    const parsed = parseIsoDateOnly(date);
+    if (!parsed) {
+      return '';
+    }
+    return parsed.toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   }
 }

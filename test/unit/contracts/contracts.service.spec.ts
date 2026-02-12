@@ -370,4 +370,75 @@ describe('ContractsService', () => {
     expect(result.contractId).toBe('contract-1');
     expect(result.items.length).toBeGreaterThan(0);
   });
+
+  it('returns installment contract details for dashboard view', async () => {
+    contractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      userId: 'user-1',
+      walletId: 'wallet-1',
+      categoryId: 'cat-1',
+      description: 'Notebook Dell Inspiron',
+      totalAmount: '3600.00',
+      installmentsCount: 12,
+      firstDueDate: '2026-01-10',
+      createdAt: new Date('2026-01-10T00:00:00.000Z'),
+      wallet: { id: 'wallet-1', name: 'Nubank' },
+      category: { id: 'cat-1', name: 'Eletronicos' },
+      occurrences: [
+        {
+          id: 'occ-1',
+          installmentIndex: 1,
+          dueDate: '2026-01-10',
+          amount: '300.00',
+          installmentStatus: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-1',
+        },
+        {
+          id: 'occ-2',
+          installmentIndex: 2,
+          dueDate: '2026-02-10',
+          amount: '300.00',
+          installmentStatus: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-2',
+        },
+        {
+          id: 'occ-3',
+          installmentIndex: 3,
+          dueDate: '2026-03-10',
+          amount: '300.00',
+          installmentStatus: OccurrenceStatusEnum.Scheduled,
+          transactionId: null,
+        },
+      ],
+    });
+
+    const result = await service.getInstallmentContractDetails(
+      'contract-1',
+      'user-1',
+    );
+
+    expect(result.contractId).toBe('contract-1');
+    expect(result.header.title).toBe('Notebook Dell Inspiron');
+    expect(result.header.installmentLabel).toBe('12x de R$ 300,00');
+    expect(result.header.totalLabel).toBe('R$ 3600,00');
+    expect(result.header.paidCount).toBe(2);
+    expect(result.header.futureCount).toBe(10);
+    expect(result.header.progress).toEqual({
+      paid: 2,
+      total: 12,
+      percent: 17,
+    });
+    expect(result.contractInfo.categoryName).toBe('Eletronicos');
+    expect(result.contractInfo.billingDayLabel).toBe('Todo dia 10');
+    expect(result.installments[0].status).toBe('PAID');
+    expect(result.installments[2].status).toBe('FUTURE');
+  });
+
+  it('throws NotFoundException when installment contract is not found', async () => {
+    contractRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.getInstallmentContractDetails('missing-contract', 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

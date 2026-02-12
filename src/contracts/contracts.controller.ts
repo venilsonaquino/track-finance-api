@@ -13,7 +13,6 @@ import { ContractsService } from './contracts.service';
 import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
-import { GetContractOccurrencesQueryDto } from './dtos/get-contract-occurrences-query.dto';
 import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 
@@ -36,15 +35,6 @@ export class ContractsController {
     @CurrentUser() user: any,
   ) {
     return this.service.createRecurringContract(user.id, dto);
-  }
-
-  @Get(':contractId/occurrences')
-  async getOccurrences(
-    @Param('contractId') contractId: string,
-    @Query() query: GetContractOccurrencesQueryDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.service.getContractOccurrences(contractId, query, user.id);
   }
 
   @Patch(':contractId/occurrences/:dueDate')
@@ -92,11 +82,11 @@ export class ContractsController {
     );
   }
 
-  @Get(':contractId')
-  async getContractById(
+  @Get('installments/:contractId/details')
+  async getInstallmentDetails(
     @Param('contractId') contractId: string,
     @CurrentUser() user: any,
   ) {
-    return this.service.getContractById(contractId, user.id);
+    return this.service.getInstallmentContractDetails(contractId, user.id);
   }
 }
