@@ -176,6 +176,139 @@ describe('TransactionsService', () => {
     );
   });
 
+  it('updates transaction fields and moves balance when wallet changes', async () => {
+    transactionalModel.findOne = jest.fn(async () => ({
+      id: 'tx-1',
+      amount: '50.00',
+      walletId: 'wallet-old',
+      transactionType: TransactionType.Expense,
+      transactionStatus: TransactionStatus.Posted,
+    }));
+    transactionalModel.update = jest.fn(async () => [
+      1,
+      [
+        {
+          id: 'tx-1',
+          description: 'Updated description',
+          depositedDate: '2026-02-10',
+          categoryId: 'cat-2',
+          walletId: 'wallet-new',
+        },
+      ],
+    ]);
+
+    const dto = {
+      description: 'Updated description',
+      depositedDate: '2026-02-10',
+      categoryId: 'cat-2',
+      walletId: 'wallet-new',
+    };
+
+    const result = await service.update('tx-1', dto as any, 'user-1');
+
+    expect(transactionalModel.update).toHaveBeenCalledWith(
+      {
+        description: 'Updated description',
+        depositedDate: '2026-02-10',
+        categoryId: 'cat-2',
+        walletId: 'wallet-new',
+      },
+      {
+        where: { id: 'tx-1', userId: 'user-1' },
+        returning: true,
+      },
+    );
+    expect(walletFacade.adjustWalletBalance).toHaveBeenNthCalledWith(
+      1,
+      'wallet-old',
+      'user-1',
+      50,
+    );
+    expect(walletFacade.adjustWalletBalance).toHaveBeenNthCalledWith(
+      2,
+      'wallet-new',
+      'user-1',
+      -50,
+    );
+    expect(result).toEqual({
+      id: 'tx-1',
+      description: 'Updated description',
+      depositedDate: '2026-02-10',
+      categoryId: 'cat-2',
+      walletId: 'wallet-new',
+    });
+  });
+
+  it('updates transaction without moving balance when wallet does not change', async () => {
+    transactionalModel.findOne = jest.fn(async () => ({
+      id: 'tx-1',
+      amount: '120.00',
+      walletId: 'wallet-1',
+      transactionType: TransactionType.Income,
+      transactionStatus: TransactionStatus.Posted,
+    }));
+    transactionalModel.update = jest.fn(async () => [
+      1,
+      [
+        {
+          id: 'tx-1',
+          description: 'Edited',
+          depositedDate: '2026-02-11',
+          categoryId: 'cat-1',
+          walletId: 'wallet-1',
+        },
+      ],
+    ]);
+
+    await service.update(
+      'tx-1',
+      {
+        description: 'Edited',
+        depositedDate: '2026-02-11',
+        categoryId: 'cat-1',
+        walletId: 'wallet-1',
+      } as any,
+      'user-1',
+    );
+
+    expect(walletFacade.adjustWalletBalance).not.toHaveBeenCalled();
+  });
+
+  it('updates transaction without moving balance when status is reversed', async () => {
+    transactionalModel.findOne = jest.fn(async () => ({
+      id: 'tx-1',
+      amount: '120.00',
+      walletId: 'wallet-1',
+      transactionType: TransactionType.Income,
+      transactionStatus: TransactionStatus.Reversed,
+    }));
+    transactionalModel.update = jest.fn(async () => [
+      1,
+      [
+        {
+          id: 'tx-1',
+          description: 'Edited',
+          depositedDate: '2026-02-11',
+          categoryId: 'cat-1',
+          walletId: 'wallet-2',
+        },
+      ],
+    ]);
+
+    await service.update(
+      'tx-1',
+      {
+        description: 'Edited',
+        depositedDate: '2026-02-11',
+        categoryId: 'cat-1',
+        walletId: 'wallet-2',
+      } as any,
+      'user-1',
+    );
+
+    expect(walletFacade.adjustWalletBalance).not.toHaveBeenCalled();
+  });
+
   it('reverses a transaction successfully', async () => {
     transactionalModel.findOne = jest.fn(async () => ({
       id: 'tx-1',

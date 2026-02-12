@@ -718,44 +718,52 @@ export class TransactionsService {
     updateTransactionDto: UpdateTransactionDto,
     userId: string,
   ) {
-    const transaction = new TransactionEntity({
-      depositedDate: updateTransactionDto.depositedDate,
-      description: updateTransactionDto.description,
-      amount: Math.abs(+updateTransactionDto.amount),
-      userId: userId,
-      categoryId: updateTransactionDto.categoryId,
-      walletId: updateTransactionDto.walletId,
-      transactionType: updateTransactionDto.transactionType,
-      transactionStatus: updateTransactionDto.transactionStatus,
+    const existingTransaction = await this.transactionalModel.findOne({
+      where: { id, userId },
     });
 
-    const sequelize = this.transactionalModel.sequelize;
-    const [affectedCount, updated] = sequelize
-      ? await sequelize.transaction(async (tx) => {
-          const result = await this.transactionalModel.update(
-            transaction as any,
-            {
-              where: { id, userId },
-              returning: true,
-              transaction: tx,
-            },
-          );
-
-          await this.transactionOfxService.syncDetails(
-            id,
-            updateTransactionDto,
-            tx,
-          );
-
-          return result;
-        })
-      : await this.transactionalModel.update(transaction as any, {
-          where: { id, userId },
-          returning: true,
-        });
-
-    if (affectedCount == 0 && updated.length == 0) {
+    if (!existingTransaction) {
       throw new NotFoundException(`Transaction with id ${id} not found`);
+    }
+
+    const [affectedCount, updated] = await this.transactionalModel.update(
+      {
+        depositedDate: updateTransactionDto.depositedDate,
+        description: updateTransactionDto.description,
+        categoryId: updateTransactionDto.categoryId,
+        walletId: updateTransactionDto.walletId,
+      },
+      {
+        where: { id, userId },
+        returning: true,
+      },
+    );
+
+    if (affectedCount === 0 || updated.length === 0) {
+      throw new NotFoundException(`Transaction with id ${id} not found`);
+    }
+
+    const walletChanged = existingTransaction.walletId !== updateTransactionDto.walletId;
+    const shouldMoveBalance =
+      walletChanged &&
+      existingTransaction.transactionStatus === TransactionStatus.Posted;
+
+    if (shouldMoveBalance) {
+      const delta = TransactionEntity.resolveBalanceDelta(
+        Number(existingTransaction.amount),
+        existingTransaction.transactionType,
+      );
+
+      await this.walletFacade.adjustWalletBalance(
+        existingTransaction.walletId,
+        userId,
+        -delta,
+      );
+      await this.walletFacade.adjustWalletBalance(
+        updateTransactionDto.walletId,
+        userId,
+        delta,
+      );
     }
 
     return updated[0];
