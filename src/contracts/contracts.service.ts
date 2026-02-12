@@ -347,9 +347,31 @@ export class ContractsService {
       a.dueDate.localeCompare(b.dueDate),
     );
 
-    const paidCount = occurrences.filter(
-      (occ) =>
-        occ.installmentStatus === OccurrenceStatusEnum.Posted || !!occ.transactionId,
+    const transactionStatusById = await this.getTransactionStatusByIds(
+      occurrences.map((occ) => occ.transactionId).filter(Boolean) as string[],
+      userId,
+    );
+    const mappedInstallments = occurrences.map((occ) => {
+      const transactionStatus = occ.transactionId
+        ? (transactionStatusById.get(occ.transactionId) ?? null)
+        : null;
+      const status = this.resolveOccurrenceStatus(
+        occ.installmentStatus,
+        transactionStatus,
+      );
+      return {
+        id: occ.id,
+        installmentIndex: occ.installmentIndex,
+        dueDate: occ.dueDate,
+        amount: this.formatBrlAmount(occ.amount),
+        status,
+        transactionId: occ.transactionId ?? null,
+        transactionStatus,
+      };
+    });
+
+    const paidCount = mappedInstallments.filter(
+      (occ) => occ.status === 'PAID' || occ.status === 'REVERSED',
     ).length;
     const totalCount = contract.installmentsCount ?? occurrences.length;
     const futureCount = Math.max(totalCount - paidCount, 0);
@@ -360,8 +382,9 @@ export class ContractsService {
       contract.installmentsCount,
     );
 
-    const nextOccurrence = occurrences.find(
-      (occ) => occ.installmentStatus !== OccurrenceStatusEnum.Posted && !occ.transactionId,
+    const today = formatIsoDateOnly(new Date());
+    const nextOccurrence = mappedInstallments.find(
+      (occ) => occ.status === 'FUTURE' && occ.dueDate >= today,
     );
     const nextInvoice = nextOccurrence
       ? this.formatMonthYear(nextOccurrence.dueDate)
@@ -396,17 +419,7 @@ export class ContractsService {
           nextInvoice,
         },
       },
-      installments: occurrences.map((occ) => ({
-        id: occ.id,
-        installmentIndex: occ.installmentIndex,
-        dueDate: occ.dueDate,
-        amount: this.formatBrlAmount(occ.amount),
-        status:
-          occ.installmentStatus === OccurrenceStatusEnum.Posted || !!occ.transactionId
-            ? 'PAID'
-            : 'FUTURE',
-        transactionId: occ.transactionId ?? null,
-      })),
+      installments: mappedInstallments,
     };
   }
 
@@ -431,28 +444,33 @@ export class ContractsService {
       a.dueDate.localeCompare(b.dueDate),
     );
 
-    const paidAll = occurrences.filter(
-      (occ) => occ.status === OccurrenceStatusEnum.Posted || !!occ.transactionId,
-    );
-    const paidTransactionStatusById = await this.getTransactionStatusByIds(
-      paidAll.map((occ) => occ.transactionId).filter(Boolean) as string[],
+    const transactionStatusById = await this.getTransactionStatusByIds(
+      occurrences.map((occ) => occ.transactionId).filter(Boolean) as string[],
       userId,
     );
+    const resolvedOccurrences = occurrences.map((occ) => {
+      const transactionStatus = occ.transactionId
+        ? (transactionStatusById.get(occ.transactionId) ?? null)
+        : null;
+      const status = this.resolveOccurrenceStatus(
+        occ.status,
+        transactionStatus,
+      );
+      return {
+        id: occ.id,
+        dueDate: occ.dueDate,
+        amount: String(occ.amount),
+        status,
+        transactionId: occ.transactionId ?? null,
+        transactionStatus,
+      };
+    });
+    const paidAll = resolvedOccurrences.filter((occ) => occ.status === 'PAID');
 
     const paidRecent = [...paidAll]
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
       .slice(0, 3)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .map((occ) => ({
-        id: occ.id,
-        dueDate: occ.dueDate,
-        amount: String(occ.amount),
-        status: 'PAID' as const,
-        transactionId: occ.transactionId ?? null,
-        transactionStatus: occ.transactionId
-          ? (paidTransactionStatusById.get(occ.transactionId) ?? null)
-          : null,
-      }));
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
     const upcomingGenerated = this.generateUpcomingRecurringOccurrences(contract, 3);
     const nextChargeDate = upcomingGenerated[0]?.dueDate ?? null;
@@ -742,6 +760,28 @@ export class ContractsService {
     }
 
     return items;
+  }
+
+  private resolveOccurrenceStatus(
+    occurrenceStatus: OccurrenceStatusEnum | null | undefined,
+    transactionStatus: TransactionStatus | null,
+  ): 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' {
+    if (occurrenceStatus === OccurrenceStatusEnum.Posted) {
+      if (transactionStatus === TransactionStatus.Reversed) {
+        return 'REVERSED';
+      }
+      return 'PAID';
+    }
+
+    if (occurrenceStatus === OccurrenceStatusEnum.Cancelled) {
+      return 'CANCELLED';
+    }
+
+    if (occurrenceStatus === OccurrenceStatusEnum.Skipped) {
+      return 'SKIPPED';
+    }
+
+    return 'FUTURE';
   }
 
   private async getTransactionStatusByIds(

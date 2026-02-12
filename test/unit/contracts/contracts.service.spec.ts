@@ -493,6 +493,62 @@ describe('ContractsService', () => {
     expect(result.installments[2].status).toBe('FUTURE');
   });
 
+  it('maps installment status using occurrence and transactionStatus rules', async () => {
+    transactionRepo.findAll.mockResolvedValueOnce([
+      { id: 'tx-1', transactionStatus: 'REVERSED' },
+      { id: 'tx-2', transactionStatus: 'POSTED' },
+    ]);
+    contractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      userId: 'user-1',
+      walletId: 'wallet-1',
+      categoryId: 'cat-1',
+      description: 'Contrato',
+      totalAmount: '400.00',
+      installmentsCount: 4,
+      firstDueDate: '2026-01-10',
+      createdAt: new Date('2026-01-10T00:00:00.000Z'),
+      wallet: { id: 'wallet-1', name: 'Nubank' },
+      category: { id: 'cat-1', name: 'Eletronicos' },
+      occurrences: [
+        {
+          id: 'occ-1',
+          installmentIndex: 1,
+          dueDate: '2026-01-10',
+          amount: '100.00',
+          installmentStatus: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-1',
+        },
+        {
+          id: 'occ-2',
+          installmentIndex: 2,
+          dueDate: '2026-02-10',
+          amount: '100.00',
+          installmentStatus: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-2',
+        },
+        {
+          id: 'occ-3',
+          installmentIndex: 3,
+          dueDate: '2026-03-10',
+          amount: '100.00',
+          installmentStatus: OccurrenceStatusEnum.Cancelled,
+          transactionId: null,
+        },
+      ],
+    });
+
+    const result = await service.getInstallmentContractDetails(
+      'contract-1',
+      'user-1',
+    );
+
+    expect(result.header.paidCount).toBe(2);
+    expect(result.installments[0].status).toBe('REVERSED');
+    expect(result.installments[1].status).toBe('PAID');
+    expect(result.installments[2].status).toBe('CANCELLED');
+  });
+
   it('throws NotFoundException when installment contract is not found', async () => {
     contractRepo.findOne.mockResolvedValueOnce(null);
 

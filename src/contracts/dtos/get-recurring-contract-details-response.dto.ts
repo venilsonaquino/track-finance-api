@@ -1,10 +1,12 @@
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+
 export class RecurringOccurrenceItemDto {
   id: string | null;
   dueDate: string;
   amount: string;
-  status: 'PAID' | 'FUTURE';
+  status: 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED';
   transactionId: string | null;
-  transactionStatus: string | null;
+  transactionStatus: TransactionStatus | null;
 }
 
 export class GetRecurringContractDetailsResponseDto {

@@ -1,10 +1,13 @@
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+
 export class InstallmentContractInstallmentItemDto {
   id: string;
   installmentIndex: number;
   dueDate: string;
   amount: string;
-  status: 'PAID' | 'FUTURE';
+  status: 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED';
   transactionId: string | null;
+  transactionStatus: TransactionStatus | null;
 }
 
 export class GetInstallmentContractDetailsResponseDto {
