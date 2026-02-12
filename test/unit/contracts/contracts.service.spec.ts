@@ -441,4 +441,68 @@ describe('ContractsService', () => {
       service.getInstallmentContractDetails('missing-contract', 'user-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('returns recurring contract details in semantic payload for screen', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'rec-1',
+      userId: 'user-1',
+      description: 'Academia SmartFit',
+      amount: '120.00',
+      installmentInterval: IntervalEnum.Monthly,
+      firstDueDate: '2026-01-10',
+      endsAt: null,
+      status: ContractStatusEnum.Active,
+      createdAt: new Date('2026-01-10T00:00:00.000Z'),
+      wallet: { id: 'wallet-1', name: 'Banco Inter' },
+      category: { id: 'cat-1', name: 'Saude' },
+      occurrences: [
+        {
+          id: 'ro-1',
+          dueDate: '2026-01-10',
+          amount: '120.00',
+          status: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-1',
+        },
+        {
+          id: 'ro-2',
+          dueDate: '2026-02-10',
+          amount: '120.00',
+          status: OccurrenceStatusEnum.Posted,
+          transactionId: 'tx-2',
+        },
+      ],
+    });
+
+    const result = await service.getRecurringContractDetails('rec-1', 'user-1');
+
+    expect(result.contractId).toBe('rec-1');
+    expect(result.contract.type).toBe('FIXED');
+    expect(result.contract.recurrenceType).toBe('RECURRING');
+    expect(result.contract.title).toBe('Academia SmartFit');
+    expect(result.contract.interval).toBe(IntervalEnum.Monthly);
+    expect(result.contract.amount).toBe('120.00');
+    expect(result.contract.status).toBe(ContractStatusEnum.Active);
+    expect(result.contract.nextChargeDate).toBe('2026-03-10');
+    expect(result.recurringInfo.periodicity).toBe(IntervalEnum.Monthly);
+    expect(result.recurringInfo.billingDay).toBe(10);
+    expect(result.recurringInfo.account.name).toBe('Banco Inter');
+    expect(result.recurringInfo.category.name).toBe('Saude');
+    expect(result.recurringInfo.createdAt).toBe('2026-01-10T00:00:00.000Z');
+    expect(result.occurrenceHistory.items).toHaveLength(5);
+    expect(result.occurrenceHistory.items[0].status).toBe('PAID');
+    expect(result.occurrenceHistory.items[4].status).toBe('FUTURE');
+    expect(result.occurrenceHistory.paidLimit).toBe(3);
+    expect(result.occurrenceHistory.futureLimit).toBe(3);
+    expect(result.occurrenceHistory.hasMoreHistory).toBe(false);
+    expect(result.financialSummary.totalPaid).toBe('240.00');
+    expect(result.financialSummary.activeMonths).toBe(2);
+  });
+
+  it('throws NotFoundException when recurring contract details is not found', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.getRecurringContractDetails('missing-rec', 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

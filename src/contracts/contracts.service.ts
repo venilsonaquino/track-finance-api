@@ -36,6 +36,8 @@ import { TransactionStatus } from 'src/transactions/enums/transaction-status.enu
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 import { TransactionOfxService } from 'src/transactions/transaction-ofx.service';
 import { GetInstallmentContractDetailsResponseDto } from './dtos/get-installment-contract-details-response.dto';
+import { GetRecurringContractDetailsResponseDto } from './dtos/get-recurring-contract-details-response.dto';
+import { createDueDateBuilder } from 'src/common/utils/create-due-date-builder';
 
 @Injectable()
 export class ContractsService {
@@ -399,6 +401,97 @@ export class ContractsService {
     };
   }
 
+  async getRecurringContractDetails(
+    contractId: string,
+    userId: string,
+  ): Promise<GetRecurringContractDetailsResponseDto> {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+      include: [
+        { model: CategoryModel, as: 'category' },
+        { model: WalletModel, as: 'wallet' },
+        { model: RecurringOccurrenceModel, as: 'occurrences' },
+      ],
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+
+    const occurrences = [...(contract.occurrences ?? [])].sort((a, b) =>
+      a.dueDate.localeCompare(b.dueDate),
+    );
+
+    const paidAll = occurrences.filter(
+      (occ) => occ.status === OccurrenceStatusEnum.Posted || !!occ.transactionId,
+    );
+
+    const paidRecent = [...paidAll]
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
+      .slice(0, 3)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map((occ) => ({
+        id: occ.id,
+        dueDate: occ.dueDate,
+        amount: String(occ.amount),
+        status: 'PAID' as const,
+        transactionId: occ.transactionId ?? null,
+      }));
+
+    const upcomingGenerated = this.generateUpcomingRecurringOccurrences(contract, 3);
+    const nextChargeDate = upcomingGenerated[0]?.dueDate ?? null;
+
+    const totalPaid = paidAll.reduce((sum, occ) => sum + Number(occ.amount), 0);
+
+    return {
+      contractId: contract.id,
+      contract: {
+        title: contract.description ?? null,
+        type: 'FIXED',
+        recurrenceType: 'RECURRING',
+        interval: contract.installmentInterval,
+        amount: String(contract.amount),
+        status: contract.status,
+        nextChargeDate,
+      },
+      recurringInfo: {
+        value: String(contract.amount),
+        periodicity: contract.installmentInterval,
+        billingDay: Number(contract.firstDueDate.slice(8, 10)),
+        account: {
+          id: contract.wallet?.id ?? null,
+          name: contract.wallet?.name ?? null,
+        },
+        category: {
+          id: contract.category?.id ?? null,
+          name: contract.category?.name ?? null,
+        },
+        createdAt: contract.createdAt
+          ? new Date(contract.createdAt).toISOString()
+          : null,
+      },
+      occurrenceHistory: {
+        items: [
+          ...paidRecent,
+          ...upcomingGenerated.map((occ) => ({
+            id: null,
+            dueDate: occ.dueDate,
+            amount: String(occ.amount),
+            status: 'FUTURE' as const,
+            transactionId: null,
+          })),
+        ],
+        paidLimit: 3,
+        futureLimit: 3,
+        hasMoreHistory: paidAll.length > 3,
+      },
+      financialSummary: {
+        totalPaid: totalPaid.toFixed(2),
+        activeMonths: paidAll.length,
+      },
+    };
+  }
+
   async payInstallmentOccurrence(
     contractId: string,
     installmentIndex: number,
@@ -611,5 +704,58 @@ export class ContractsService {
       year: 'numeric',
       timeZone: 'UTC',
     });
+  }
+
+  private generateUpcomingRecurringOccurrences(
+    contract: RecurringContractModel,
+    limit: number,
+  ): Array<{ dueDate: string; amount: string }> {
+    const today = formatIsoDateOnly(new Date());
+    const dueDateBuilder = createDueDateBuilder(
+      contract.firstDueDate,
+      contract.installmentInterval,
+    );
+    const overrideByDate = new Map(
+      (contract.occurrences ?? []).map((occ) => [occ.dueDate, occ]),
+    );
+
+    const items: Array<{ dueDate: string; amount: string }> = [];
+    let offset = 0;
+    let guard = 0;
+
+    while (items.length < limit && guard < 600) {
+      guard += 1;
+      const dueDate = formatIsoDateOnly(dueDateBuilder(offset));
+      offset += 1;
+
+      if (dueDate < contract.firstDueDate) {
+        continue;
+      }
+      if (dueDate < today) {
+        continue;
+      }
+      if (contract.endsAt && dueDate > contract.endsAt) {
+        break;
+      }
+
+      const override = overrideByDate.get(dueDate);
+      if (override) {
+        if (override.status === OccurrenceStatusEnum.Posted || override.transactionId) {
+          continue;
+        }
+        if (
+          override.status === OccurrenceStatusEnum.Skipped ||
+          override.status === OccurrenceStatusEnum.Cancelled
+        ) {
+          continue;
+        }
+        items.push({ dueDate, amount: String(override.amount) });
+        continue;
+      }
+
+      items.push({ dueDate, amount: String(contract.amount) });
+    }
+
+    return items;
   }
 }

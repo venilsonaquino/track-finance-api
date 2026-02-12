@@ -89,4 +89,12 @@ export class ContractsController {
   ) {
     return this.service.getInstallmentContractDetails(contractId, user.id);
   }
+
+  @Get('recurring/:contractId/details')
+  async getRecurringDetails(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.getRecurringContractDetails(contractId, user.id);
+  }
 }
