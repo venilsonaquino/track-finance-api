@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { TransactionsService } from 'src/transactions/transactions.service';
 import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
@@ -10,6 +14,7 @@ describe('TransactionsService', () => {
   let transactionOfxService: any;
   let installmentOccurrenceRepo: any;
   let recurringOccurrenceRepo: any;
+  let recurringContractRepo: any;
   let walletFacade: any;
   let logger: any;
 
@@ -30,8 +35,12 @@ describe('TransactionsService', () => {
     recurringOccurrenceRepo = {
       findAll: jest.fn(),
     };
+    recurringContractRepo = {
+      findAll: jest.fn(),
+    };
     walletFacade = {
       adjustWalletBalance: jest.fn(),
+      getWalletBalance: jest.fn(),
     };
     logger = {
       log: jest.fn(),
@@ -41,6 +50,7 @@ describe('TransactionsService', () => {
       transactionalModel as any,
       installmentOccurrenceRepo as any,
       recurringOccurrenceRepo as any,
+      recurringContractRepo as any,
       walletFacade as any,
       logger as any,
       transactionOfxService as any,
@@ -164,5 +174,67 @@ describe('TransactionsService', () => {
       'user-1',
       200,
     );
+  });
+
+  it('reverses a transaction successfully', async () => {
+    transactionalModel.findOne = jest.fn(async () => ({
+      id: 'tx-1',
+      amount: '100.00',
+      transactionType: TransactionType.Income,
+      walletId: 'wallet-1',
+      transactionStatus: TransactionStatus.Posted,
+    }));
+    transactionalModel.update = jest.fn(async () => [
+        1,
+        [{ id: 'tx-1', transactionStatus: TransactionStatus.Reversed }],
+      ]);
+
+    const result = await service.reverse('tx-1', 'user-1');
+
+    expect(transactionalModel.findOne).toHaveBeenCalledWith({
+      where: { id: 'tx-1', userId: 'user-1' },
+    });
+    expect(transactionalModel.update).toHaveBeenCalledWith(
+      { transactionStatus: TransactionStatus.Reversed },
+      {
+        where: { id: 'tx-1', userId: 'user-1' },
+        returning: true,
+      },
+    );
+    expect(walletFacade.adjustWalletBalance).toHaveBeenCalledWith(
+      'wallet-1',
+      'user-1',
+      -100,
+    );
+    expect(result).toEqual({
+      id: 'tx-1',
+      transactionStatus: TransactionStatus.Reversed,
+    });
+  });
+
+  it('throws NotFoundException when reversing a non-existing transaction', async () => {
+    transactionalModel.findOne = jest.fn(async () => null);
+
+    await expect(service.reverse('tx-404', 'user-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(transactionalModel.update).toBeUndefined();
+    expect(walletFacade.adjustWalletBalance).not.toHaveBeenCalled();
+  });
+
+  it('throws BadRequestException when transaction is already reversed', async () => {
+    transactionalModel.findOne = jest.fn(async () => ({
+      id: 'tx-1',
+      amount: '100.00',
+      transactionType: TransactionType.Income,
+      walletId: 'wallet-1',
+      transactionStatus: TransactionStatus.Reversed,
+    }));
+
+    await expect(service.reverse('tx-1', 'user-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(transactionalModel.update).toBeUndefined();
+    expect(walletFacade.adjustWalletBalance).not.toHaveBeenCalled();
   });
 });

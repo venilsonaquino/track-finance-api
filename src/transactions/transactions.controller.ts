@@ -93,6 +93,12 @@ export class TransactionsController {
     );
   }
 
+  @Post(':id/reverse')
+  async reverse(@Param('id') id: string, @Request() req) {
+    const { user } = req;
+    return await this.transactionsService.reverse(id, user.id);
+  }
+
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   async remove(@Param('id') id: string, @Request() req) {

@@ -761,6 +761,48 @@ export class TransactionsService {
     return updated[0];
   }
 
+  async reverse(id: string, userId: string) {
+    const transaction = await this.transactionalModel.findOne({
+      where: { id, userId },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction with id ${id} not found`);
+    }
+
+    if (transaction.transactionStatus === TransactionStatus.Reversed) {
+      throw new BadRequestException(
+        `Transaction with id ${id} is already reversed`,
+      );
+    }
+
+    const [affectedCount, updated] = await this.transactionalModel.update(
+      { transactionStatus: TransactionStatus.Reversed },
+      {
+        where: { id, userId },
+        returning: true,
+      },
+    );
+
+    if (affectedCount === 0 || updated.length === 0) {
+      throw new NotFoundException(`Transaction with id ${id} not found`);
+    }
+
+    const reverseDelta =
+      -TransactionEntity.resolveBalanceDelta(
+        Number(transaction.amount),
+        transaction.transactionType,
+      );
+
+    await this.walletFacade.adjustWalletBalance(
+      transaction.walletId,
+      userId,
+      reverseDelta,
+    );
+
+    return updated[0];
+  }
+
   async remove(id: string, userId: string) {
     const deletedCount = await this.transactionalModel.destroy({
       where: { id, userId },
