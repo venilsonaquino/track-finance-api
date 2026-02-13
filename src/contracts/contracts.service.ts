@@ -886,6 +886,10 @@ export class ContractsService {
       .reverse()
       .find((revision) => revision.effectiveFrom <= today);
     const nextRevision = revisions.find((revision) => revision.effectiveFrom > today);
+    const contractCreatedAt =
+      (contract as any).createdAt ?? (contract as any).created_at ?? null;
+    const contractUpdatedAt =
+      (contract as any).updatedAt ?? (contract as any).updated_at ?? null;
 
     const totalPaid = paidAll.reduce((sum, occ) => sum + Number(occ.amount), 0);
 
@@ -899,13 +903,12 @@ export class ContractsService {
         amount: currentAmount,
         status: contract.status,
         nextChargeDate,
-        endsAt: contract.endsAt ?? null,
         ends_at: contract.endsAt ?? null,
-        created_at: contract.createdAt
-          ? new Date(contract.createdAt).toISOString()
+        created_at: contractCreatedAt
+          ? new Date(contractCreatedAt).toISOString()
           : null,
-        updated_at: contract.updatedAt
-          ? new Date(contract.updatedAt).toISOString()
+        updated_at: contractUpdatedAt
+          ? new Date(contractUpdatedAt).toISOString()
           : null,
       },
       recurringInfo: {
@@ -927,8 +930,8 @@ export class ContractsService {
               amount: String(nextRevision.amount),
             }
           : null,
-        createdAt: contract.createdAt
-          ? new Date(contract.createdAt).toISOString()
+        createdAt: contractCreatedAt
+          ? new Date(contractCreatedAt).toISOString()
           : null,
       },
       occurrenceHistory: {
