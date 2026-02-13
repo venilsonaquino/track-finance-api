@@ -191,7 +191,9 @@ export class ContractsService {
       where: {
         id: contractId,
         userId: userId,
-        status: ContractStatusEnum.Active,
+        status: {
+          [Op.in]: [ContractStatusEnum.Active, ContractStatusEnum.Paused],
+        },
       },
     });
 
@@ -897,6 +899,14 @@ export class ContractsService {
         amount: currentAmount,
         status: contract.status,
         nextChargeDate,
+        endsAt: contract.endsAt ?? null,
+        ends_at: contract.endsAt ?? null,
+        created_at: contract.createdAt
+          ? new Date(contract.createdAt).toISOString()
+          : null,
+        updated_at: contract.updatedAt
+          ? new Date(contract.updatedAt).toISOString()
+          : null,
       },
       recurringInfo: {
         value: currentAmount,

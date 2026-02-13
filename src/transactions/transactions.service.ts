@@ -464,7 +464,9 @@ export class TransactionsService {
 
       const plannedInstallmentsWhere: any = {
         transactionId: null,
-        installmentStatus: OccurrenceStatusEnum.Scheduled,
+        installmentStatus: {
+          [Op.in]: [OccurrenceStatusEnum.Scheduled, OccurrenceStatusEnum.Paused],
+        },
         dueDate: { [Op.between]: [start, end] },
       };
 

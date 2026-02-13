@@ -19,6 +19,10 @@ export class GetRecurringContractDetailsResponseDto {
     amount: string;
     status: string;
     nextChargeDate: string | null;
+    endsAt: string | null;
+    ends_at: string | null;
+    created_at: string | null;
+    updated_at: string | null;
   };
   recurringInfo: {
     value: string;
