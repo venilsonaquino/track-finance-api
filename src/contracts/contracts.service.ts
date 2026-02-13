@@ -165,6 +165,12 @@ export class ContractsService {
         'Recurring contracts are only allowed for CREDIT_CARD wallets.',
       );
     }
+    const category = await this.categoryRepo.findOne({
+      where: { id: dto.categoryId, userId },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found for user.');
+    }
 
     return this.sequelize.transaction(async (transaction) => {
       const contract = await this.recurringContractRepo.create(

@@ -7,6 +7,7 @@ import {
 import { TransactionsService } from 'src/transactions/transactions.service';
 import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+import { WalletFinancialType } from 'src/wallets/enums/wallet-financial-type.enum';
 
 describe('TransactionsService', () => {
   let service: TransactionsService;
@@ -16,6 +17,7 @@ describe('TransactionsService', () => {
   let recurringOccurrenceRepo: any;
   let recurringContractRepo: any;
   let recurringRevisionRepo: any;
+  let walletRepo: any;
   let walletFacade: any;
   let logger: any;
 
@@ -42,6 +44,12 @@ describe('TransactionsService', () => {
     recurringRevisionRepo = {
       findAll: jest.fn(),
     };
+    walletRepo = {
+      findOne: jest.fn().mockImplementation(async () => ({
+        id: 'wallet-1',
+        financialType: WalletFinancialType.Account,
+      })),
+    };
     walletFacade = {
       adjustWalletBalance: jest.fn(),
       getWalletBalance: jest.fn(),
@@ -56,6 +64,7 @@ describe('TransactionsService', () => {
       recurringOccurrenceRepo as any,
       recurringContractRepo as any,
       recurringRevisionRepo as any,
+      walletRepo as any,
       walletFacade as any,
       logger as any,
       transactionOfxService as any,
@@ -90,6 +99,30 @@ describe('TransactionsService', () => {
       'user-1',
       100,
     );
+  });
+
+  it('throws BadRequestException when creating a transaction for CREDIT_CARD wallet', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.CreditCard,
+    });
+
+    const dto = {
+      depositedDate: '2026-01-01',
+      description: 'Card purchase',
+      amount: 100,
+      userId: 'user-1',
+      categoryId: 'cat-1',
+      walletId: 'wallet-1',
+      transactionType: TransactionType.Expense,
+      transactionStatus: TransactionStatus.Posted,
+      affectBalance: true,
+    } as any;
+
+    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(transactionalModel.create).not.toHaveBeenCalled();
   });
 
   it('creates a transaction without adjusting balance when affectBalance is false', async () => {
@@ -179,6 +212,48 @@ describe('TransactionsService', () => {
       'user-1',
       200,
     );
+  });
+
+  it('throws BadRequestException when batch has CREDIT_CARD wallet', async () => {
+    walletRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'wallet-1',
+        financialType: WalletFinancialType.Account,
+      })
+      .mockResolvedValueOnce({
+        id: 'wallet-2',
+        financialType: WalletFinancialType.CreditCard,
+      });
+
+    const dtos = [
+      {
+        depositedDate: '2026-02-01',
+        description: 'Income',
+        amount: 200,
+        userId: 'user-1',
+        categoryId: 'cat-1',
+        walletId: 'wallet-1',
+        transactionType: TransactionType.Income,
+        transactionStatus: TransactionStatus.Posted,
+        affectBalance: true,
+      },
+      {
+        depositedDate: '2026-02-02',
+        description: 'Card expense',
+        amount: 40,
+        userId: 'user-1',
+        categoryId: 'cat-1',
+        walletId: 'wallet-2',
+        transactionType: TransactionType.Expense,
+        transactionStatus: TransactionStatus.Posted,
+        affectBalance: false,
+      },
+    ] as any[];
+
+    await expect(service.createMany(dtos, 'user-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(transactionalModel.bulkCreate).not.toHaveBeenCalled();
   });
 
   it('updates transaction fields and moves balance when wallet changes', async () => {

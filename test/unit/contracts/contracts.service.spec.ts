@@ -171,6 +171,7 @@ describe('ContractsService', () => {
       id: 'wallet-1',
       financialType: WalletFinancialType.CreditCard,
     });
+    categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     recurringContractRepo.create.mockResolvedValueOnce({ id: 'rec-1' });
 
     const result = await service.createRecurringContract('user-1', {
@@ -189,6 +190,26 @@ describe('ContractsService', () => {
 
   it('throws NotFoundException when wallet is not found for recurring contract', async () => {
     walletRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.createRecurringContract('user-1', {
+        walletId: 'wallet-1',
+        categoryId: 'cat-1',
+        description: 'Recurring',
+        amount: '10.00',
+        installmentInterval: IntervalEnum.Monthly,
+        firstDueDate: '2026-01-01',
+        transactionType: 'EXPENSE',
+      } as any),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws NotFoundException when category is not found for recurring contract', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.CreditCard,
+    });
+    categoryRepo.findOne.mockResolvedValueOnce(null);
 
     await expect(
       service.createRecurringContract('user-1', {

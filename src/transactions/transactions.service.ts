@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -28,6 +29,7 @@ import {
 } from './dto/movements-response.dto';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { WalletModel } from 'src/wallets/models/wallet.model';
+import { WalletFinancialType } from 'src/wallets/enums/wallet-financial-type.enum';
 import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occurrence.model';
 import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
 import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
@@ -59,6 +61,8 @@ export class TransactionsService {
     private readonly recurringContractRepo: typeof RecurringContractModel,
     @InjectModel(RecurringContractRevisionModel)
     private readonly recurringRevisionRepo: typeof RecurringContractRevisionModel,
+    @InjectModel(WalletModel)
+    private readonly walletRepo: typeof WalletModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
     private readonly transactionOfxService: TransactionOfxService,
@@ -66,6 +70,8 @@ export class TransactionsService {
 
   async create(createTransactionDto: CreateTransactionDto, userId: string) {
     try {
+      await this.ensureAccountWallet(createTransactionDto.walletId, userId);
+
       this.logger.log(
         `Creating transaction for user=${userId} wallet=${createTransactionDto.walletId} amount=${createTransactionDto.amount} affectBalance=${createTransactionDto.affectBalance}`,
         TransactionsService.name,
@@ -122,6 +128,9 @@ export class TransactionsService {
 
       return createdTransaction;
     } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
       throw new InternalServerErrorException(detailMessage);
@@ -133,6 +142,11 @@ export class TransactionsService {
     userId: string,
   ) {
     try {
+      const walletIds = Array.from(new Set(createTransactionDtos.map((dto) => dto.walletId)));
+      await Promise.all(
+        walletIds.map((walletId) => this.ensureAccountWallet(walletId, userId)),
+      );
+
       this.logger.log(
         `Creating batch of ${createTransactionDtos.length} transactions for user=${userId}`,
         TransactionsService.name,
@@ -205,9 +219,28 @@ export class TransactionsService {
 
       return createdTransactions;
     } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       console.error('Error creating transaction:', error);
       const detailMessage = error?.parent?.detail || error?.message;
       throw new InternalServerErrorException(detailMessage);
+    }
+  }
+
+  private async ensureAccountWallet(walletId: string, userId: string) {
+    const wallet = await this.walletRepo.findOne({
+      where: { id: walletId, userId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found for user.');
+    }
+
+    if (wallet.financialType !== WalletFinancialType.Account) {
+      throw new BadRequestException(
+        'Transactions are only allowed for ACCOUNT wallets.',
+      );
     }
   }
 

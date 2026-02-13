@@ -12,6 +12,7 @@ import { RecurringContractRevisionModel } from 'src/contracts/models/recurring-c
 import { WalletsModule } from 'src/wallets/wallets.module';
 import { LoggerModule } from 'src/config/logging/logger.module';
 import { TransactionOfxService } from './transaction-ofx.service';
+import { WalletModel } from 'src/wallets/models/wallet.model';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TransactionOfxService } from './transaction-ofx.service';
       InstallmentContractModel,
       RecurringContractModel,
       RecurringContractRevisionModel,
+      WalletModel,
     ]),
     WalletsModule,
     LoggerModule,
