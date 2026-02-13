@@ -7,6 +7,7 @@ import { ContractsService } from 'src/contracts/contracts.service';
 import { IntervalEnum } from 'src/contracts/enums/interval.enum';
 import { ContractStatusEnum } from 'src/contracts/enums/contract-status.enum';
 import { OccurrenceStatusEnum } from 'src/contracts/enums/installment-occurrence-status.enum';
+import { WalletFinancialType } from 'src/wallets/enums/wallet-financial-type.enum';
 
 describe('ContractsService', () => {
   let service: ContractsService;
@@ -86,7 +87,10 @@ describe('ContractsService', () => {
   });
 
   it('creates installment contract and occurrences when generateOccurrences is true', async () => {
-    walletRepo.findOne.mockResolvedValueOnce({ id: 'wallet-1' });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.CreditCard,
+    });
     categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     contractRepo.create.mockResolvedValueOnce({ id: 'contract-1' });
     occurrenceRepo.bulkCreate.mockResolvedValueOnce([
@@ -116,7 +120,10 @@ describe('ContractsService', () => {
   });
 
   it('creates installment contract without occurrences when generateOccurrences is false', async () => {
-    walletRepo.findOne.mockResolvedValueOnce({ id: 'wallet-1' });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.CreditCard,
+    });
     categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     contractRepo.create.mockResolvedValueOnce({ id: 'contract-1' });
 
@@ -160,7 +167,10 @@ describe('ContractsService', () => {
   });
 
   it('creates recurring contract when wallet exists', async () => {
-    walletRepo.findOne.mockResolvedValueOnce({ id: 'wallet-1' });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.CreditCard,
+    });
     recurringContractRepo.create.mockResolvedValueOnce({ id: 'rec-1' });
 
     const result = await service.createRecurringContract('user-1', {
@@ -191,6 +201,48 @@ describe('ContractsService', () => {
         transactionType: 'EXPENSE',
       } as any),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws BadRequestException when installment contract wallet is ACCOUNT', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.Account,
+    });
+
+    await expect(
+      service.createInstallmentContract(
+        {
+          walletId: 'wallet-1',
+          categoryId: 'cat-1',
+          description: 'Test',
+          totalAmount: '100.00',
+          installmentsCount: 2,
+          installmentInterval: IntervalEnum.Monthly,
+          firstDueDate: '2026-01-01',
+          transactionType: 'EXPENSE',
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('throws BadRequestException when recurring contract wallet is ACCOUNT', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: WalletFinancialType.Account,
+    });
+
+    await expect(
+      service.createRecurringContract('user-1', {
+        walletId: 'wallet-1',
+        categoryId: 'cat-1',
+        description: 'Recurring',
+        amount: '10.00',
+        installmentInterval: IntervalEnum.Monthly,
+        firstDueDate: '2026-01-01',
+        transactionType: 'EXPENSE',
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('throws BadRequestException when upsertOccurrenceOverride has invalid dueDate', async () => {

@@ -85,6 +85,11 @@ export class ContractsService {
     if (!wallet) {
       throw new NotFoundException('Wallet not found for user.');
     }
+    if (wallet.financialType !== WalletFinancialType.CreditCard) {
+      throw new BadRequestException(
+        'Installment contracts are only allowed for CREDIT_CARD wallets.',
+      );
+    }
 
     const category = await this.categoryRepo.findOne({
       where: { id: dto.categoryId, userId },
@@ -154,6 +159,11 @@ export class ContractsService {
     });
     if (!wallet) {
       throw new NotFoundException('Wallet not found for user.');
+    }
+    if (wallet.financialType !== WalletFinancialType.CreditCard) {
+      throw new BadRequestException(
+        'Recurring contracts are only allowed for CREDIT_CARD wallets.',
+      );
     }
 
     return this.sequelize.transaction(async (transaction) => {
