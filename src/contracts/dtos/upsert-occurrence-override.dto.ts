@@ -1,6 +1,6 @@
 import { OccurrenceStatusEnum } from '../enums/installment-occurrence-status.enum';
 
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpsertOccurrenceOverrideDto {
   @IsOptional()
@@ -14,4 +14,12 @@ export class UpsertOccurrenceOverrideDto {
   @IsOptional()
   @IsString()
   transactionId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  applyToFuture?: boolean;
+
+  @IsOptional()
+  @IsString()
+  effectiveFrom?: string;
 }

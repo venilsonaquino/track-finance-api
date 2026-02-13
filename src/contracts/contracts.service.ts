@@ -37,6 +37,11 @@ import { TransactionEntity } from 'src/transactions/entities/transaction.entity'
 import { GetInstallmentContractDetailsResponseDto } from './dtos/get-installment-contract-details-response.dto';
 import { GetRecurringContractDetailsResponseDto } from './dtos/get-recurring-contract-details-response.dto';
 import { createDueDateBuilder } from 'src/common/utils/create-due-date-builder';
+import { RecurringContractRevisionModel } from './models/recurring-contract-revision.model';
+import {
+  RecurringAmountRevision,
+  resolveRecurringAmountByDate,
+} from './utils/resolve-recurring-amount-by-date';
 
 @Injectable()
 export class ContractsService {
@@ -50,6 +55,8 @@ export class ContractsService {
     private readonly recurringContractRepo: typeof RecurringContractModel,
     @InjectModel(RecurringOccurrenceModel)
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
+    @InjectModel(RecurringContractRevisionModel)
+    private readonly recurringRevisionRepo: typeof RecurringContractRevisionModel,
     @InjectModel(WalletModel)
     private readonly walletRepo: typeof WalletModel,
     @InjectModel(CategoryModel)
@@ -159,6 +166,15 @@ export class ContractsService {
         { transaction },
       );
 
+      await this.recurringRevisionRepo.create(
+        {
+          contractId: contract.id,
+          effectiveFrom: contract.firstDueDate,
+          amount: contract.amount,
+        },
+        { transaction },
+      );
+
       return { contract };
     });
   }
@@ -188,9 +204,18 @@ export class ContractsService {
       toDate,
     );
 
+    const revisions = await this.listContractRevisionsUntil(
+      contract.id,
+      formatIsoDateOnly(toDate),
+    );
+
     const generated: ContractOccurrenceDto[] = dueDates.map((dueDate) => ({
       dueDate,
-      amount: String(contract.amount),
+      amount: this.resolveContractAmountAtDueDate(
+        dueDate,
+        String(contract.amount),
+        revisions,
+      ),
       status: OccurrenceStatusEnum.Scheduled,
       transactionId: null,
       source: 'GENERATED' as OccurrenceSource,
@@ -263,57 +288,146 @@ export class ContractsService {
       );
     }
 
-    // 4) monta o override final (defaults)
-    const overrideToSave = {
-      contractId: contract.id,
-      dueDate, // DATEONLY string
-      amount: dto.amount ?? String(contract.amount),
-      status: dto.status ?? OccurrenceStatusEnum.Skipped, // << se quiser que PATCH sem body seja skip
-      transactionId: dto.transactionId ?? null,
-    };
+    const revisions = await this.listContractRevisionsUntil(contract.id, dueDate);
+    const defaultAmount = this.resolveContractAmountAtDueDate(
+      dueDate,
+      String(contract.amount),
+      revisions,
+    );
+    const existingOccurrence = await this.recurringOccurrenceRepo.findOne({
+      where: { contractId: contract.id, dueDate },
+    });
+    const applyToFuture = dto.applyToFuture === true;
+    const isLegacySkipRequest =
+      dto.amount === undefined &&
+      dto.status === undefined &&
+      dto.transactionId === undefined &&
+      !applyToFuture;
+    const editsCurrentOccurrence =
+      isLegacySkipRequest ||
+      dto.status !== undefined ||
+      dto.transactionId !== undefined ||
+      (dto.amount !== undefined && !applyToFuture);
 
-    // regra mínima: se status = POSTED, geralmente exige transactionId
     if (
-      overrideToSave.status === OccurrenceStatusEnum.Posted &&
-      !overrideToSave.transactionId
+      editsCurrentOccurrence &&
+      (existingOccurrence?.status === OccurrenceStatusEnum.Posted ||
+        !!existingOccurrence?.transactionId)
+    ) {
+      throw new BadRequestException(
+        'Occurrence already paid and cannot be edited.',
+      );
+    }
+
+    if (applyToFuture && dto.amount === undefined) {
+      throw new BadRequestException(
+        'amount is required when applyToFuture is true.',
+      );
+    }
+
+    if (applyToFuture) {
+      const effectiveFrom = dto.effectiveFrom ?? dueDate;
+      if (!parseIsoDateOnly(effectiveFrom)) {
+        throw new BadRequestException(
+          'Invalid effectiveFrom. Use YYYY-MM-DD.',
+        );
+      }
+      if (
+        !isDueDateOnSchedule(
+          contract.firstDueDate,
+          contract.installmentInterval,
+          effectiveFrom,
+        )
+      ) {
+        throw new BadRequestException(
+          'effectiveFrom is not valid for this contract schedule.',
+        );
+      }
+      const today = formatIsoDateOnly(new Date());
+      if (effectiveFrom < today) {
+        throw new BadRequestException(
+          'effectiveFrom cannot be in the past.',
+        );
+      }
+
+      await this.sequelize.transaction(async (transaction) => {
+        const existingRevision = await this.recurringRevisionRepo.findOne({
+          where: { contractId: contract.id, effectiveFrom },
+          transaction,
+        });
+
+        if (existingRevision) {
+          await existingRevision.update({ amount: dto.amount! }, { transaction });
+        } else {
+          await this.recurringRevisionRepo.create(
+            {
+              contractId: contract.id,
+              effectiveFrom,
+              amount: dto.amount!,
+            },
+            { transaction },
+          );
+        }
+      });
+    }
+
+    const resolvedStatus = isLegacySkipRequest
+      ? OccurrenceStatusEnum.Skipped
+      : (dto.status ?? existingOccurrence?.status ?? OccurrenceStatusEnum.Scheduled);
+    const resolvedAmount = dto.amount ?? existingOccurrence?.amount ?? defaultAmount;
+    const resolvedTransactionId =
+      dto.transactionId !== undefined
+        ? dto.transactionId
+        : existingOccurrence?.transactionId ?? null;
+
+    if (
+      resolvedStatus === OccurrenceStatusEnum.Posted &&
+      !resolvedTransactionId
     ) {
       throw new BadRequestException(
         'transactionId is required when status is POSTED.',
       );
     }
+    if (
+      resolvedStatus !== OccurrenceStatusEnum.Posted &&
+      resolvedTransactionId
+    ) {
+      throw new BadRequestException(
+        'transactionId is only allowed when status is POSTED.',
+      );
+    }
 
-    // 5) upsert (ideal) - depende do seu repo/model suportar
-    // Se seu Sequelize estiver configurado com unique (contractId, dueDate), upsert funciona bem.
-    const saved = await this.sequelize.transaction(async (transaction) => {
-      // opção A: upsert direto
-      // return await this.occurrenceOverrideRepo.upsert(overrideToSave, { transaction, returning: true });
+    const shouldPersistOccurrence = editsCurrentOccurrence;
 
-      // opção B: find + update/create (mais explícito e compatível)
-      const existing = await this.recurringOccurrenceRepo.findOne({
-        where: { contractId: contract.id, dueDate },
-        transaction,
-      });
+    const saved = shouldPersistOccurrence
+      ? await this.sequelize.transaction(async (transaction) => {
+          const payload = {
+            contractId: contract.id,
+            dueDate,
+            amount: String(resolvedAmount),
+            status: resolvedStatus,
+            transactionId: resolvedTransactionId ?? null,
+          };
 
-      if (existing) {
-        await existing.update(overrideToSave, { transaction });
-        return existing;
-      }
+          if (existingOccurrence) {
+            await existingOccurrence.update(payload, { transaction });
+            return existingOccurrence;
+          }
 
-      return await this.recurringOccurrenceRepo.create(overrideToSave, {
-        transaction,
-      });
-    });
+          return this.recurringOccurrenceRepo.create(payload, { transaction });
+        })
+      : null;
 
-    const plain = saved.get ? saved.get({ plain: true }) : saved;
+    const plain = saved?.get ? saved.get({ plain: true }) : saved;
 
     return {
       contractId: contract.id,
       occurrence: {
-        dueDate: plain.dueDate,
-        amount: String(plain.amount),
-        status: plain.status,
-        transactionId: plain.transactionId ?? null,
-        source: 'OVERRIDE' as OccurrenceSource,
+        dueDate,
+        amount: String(plain?.amount ?? resolvedAmount),
+        status: (plain?.status ?? resolvedStatus) as OccurrenceStatusEnum,
+        transactionId: plain?.transactionId ?? resolvedTransactionId ?? null,
+        source: ((plain ? 'OVERRIDE' : 'GENERATED') as OccurrenceSource),
       },
     };
   }
@@ -443,6 +557,12 @@ export class ContractsService {
     const occurrences = [...(contract.occurrences ?? [])].sort((a, b) =>
       a.dueDate.localeCompare(b.dueDate),
     );
+    const revisions = await this.listContractRevisionsUntil(contract.id);
+    const currentAmount = this.resolveContractAmountAtDueDate(
+      formatIsoDateOnly(new Date()),
+      String(contract.amount),
+      revisions,
+    );
 
     const transactionStatusById = await this.getTransactionStatusByIds(
       occurrences.map((occ) => occ.transactionId).filter(Boolean) as string[],
@@ -472,7 +592,11 @@ export class ContractsService {
       .slice(0, 3)
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-    const upcomingGenerated = this.generateUpcomingRecurringOccurrences(contract, 3);
+    const upcomingGenerated = this.generateUpcomingRecurringOccurrences(
+      contract,
+      revisions,
+      3,
+    );
     const nextChargeDate = upcomingGenerated[0]?.dueDate ?? null;
 
     const totalPaid = paidAll.reduce((sum, occ) => sum + Number(occ.amount), 0);
@@ -484,12 +608,12 @@ export class ContractsService {
         type: 'FIXED',
         recurrenceType: 'RECURRING',
         interval: contract.installmentInterval,
-        amount: String(contract.amount),
+        amount: currentAmount,
         status: contract.status,
         nextChargeDate,
       },
       recurringInfo: {
-        value: String(contract.amount),
+        value: currentAmount,
         periodicity: contract.installmentInterval,
         billingDay: Number(contract.firstDueDate.slice(8, 10)),
         account: {
@@ -654,7 +778,13 @@ export class ContractsService {
       );
     }
 
-    const amount = String(existingOccurrence?.amount ?? contract.amount);
+    const revisions = await this.listContractRevisionsUntil(contract.id, dueDate);
+    const generatedAmount = this.resolveContractAmountAtDueDate(
+      dueDate,
+      String(contract.amount),
+      revisions,
+    );
+    const amount = String(existingOccurrence?.amount ?? generatedAmount);
     const description = contract.description ?? `Recorrencia ${dueDate}`;
     const depositedDate = dto.depositedDate ?? dueDate;
     const transactionStatus =
@@ -748,6 +878,7 @@ export class ContractsService {
 
   private generateUpcomingRecurringOccurrences(
     contract: RecurringContractModel,
+    revisions: RecurringAmountRevision[],
     limit: number,
   ): Array<{ dueDate: string; amount: string }> {
     const today = formatIsoDateOnly(new Date());
@@ -793,10 +924,45 @@ export class ContractsService {
         continue;
       }
 
-      items.push({ dueDate, amount: String(contract.amount) });
+      items.push({
+        dueDate,
+        amount: this.resolveContractAmountAtDueDate(
+          dueDate,
+          String(contract.amount),
+          revisions,
+        ),
+      });
     }
 
     return items;
+  }
+
+  private async listContractRevisionsUntil(
+    contractId: string,
+    untilDueDate?: string,
+  ): Promise<RecurringAmountRevision[]> {
+    const where: any = { contractId };
+    if (untilDueDate) {
+      where.effectiveFrom = { [Op.lte]: untilDueDate };
+    }
+
+    const models = await this.recurringRevisionRepo.findAll({
+      where,
+      order: [['effectiveFrom', 'ASC']],
+    });
+
+    return models.map((revision) => ({
+      effectiveFrom: revision.effectiveFrom,
+      amount: String(revision.amount),
+    }));
+  }
+
+  private resolveContractAmountAtDueDate(
+    dueDate: string,
+    defaultAmount: string,
+    revisions: RecurringAmountRevision[],
+  ): string {
+    return resolveRecurringAmountByDate(dueDate, defaultAmount, revisions);
   }
 
   private resolveOccurrenceStatus(

@@ -15,6 +15,7 @@ describe('ContractsService', () => {
   let occurrenceRepo: any;
   let recurringContractRepo: any;
   let recurringOccurrenceRepo: any;
+  let recurringRevisionRepo: any;
   let walletRepo: any;
   let categoryRepo: any;
   let transactionRepo: any;
@@ -41,6 +42,11 @@ describe('ContractsService', () => {
       findAll: jest.fn(),
       create: jest.fn(),
     };
+    recurringRevisionRepo = {
+      create: jest.fn(),
+      findOne: jest.fn(),
+      findAll: jest.fn(async () => []),
+    };
     walletRepo = {
       findOne: jest.fn(),
     };
@@ -60,6 +66,7 @@ describe('ContractsService', () => {
       occurrenceRepo,
       recurringContractRepo,
       recurringOccurrenceRepo,
+      recurringRevisionRepo,
       walletRepo,
       categoryRepo,
       transactionRepo,

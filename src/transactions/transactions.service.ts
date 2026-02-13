@@ -40,6 +40,11 @@ import { generateDueDatesInRange } from 'src/common/utils/generate-due-dates-in-
 import { parseIsoDateOnly } from 'src/common/utils/parse-iso-date-only';
 import { TransactionOfxService } from './transaction-ofx.service';
 import { TransactionOfxModel } from './models/transaction-ofx.model';
+import { RecurringContractRevisionModel } from 'src/contracts/models/recurring-contract-revision.model';
+import {
+  RecurringAmountRevision,
+  resolveRecurringAmountByDate,
+} from 'src/contracts/utils/resolve-recurring-amount-by-date';
 
 @Injectable()
 export class TransactionsService {
@@ -52,6 +57,8 @@ export class TransactionsService {
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
     @InjectModel(RecurringContractModel)
     private readonly recurringContractRepo: typeof RecurringContractModel,
+    @InjectModel(RecurringContractRevisionModel)
+    private readonly recurringRevisionRepo: typeof RecurringContractRevisionModel,
     private readonly walletFacade: WalletFacade,
     private readonly logger: LoggerService,
     private readonly transactionOfxService: TransactionOfxService,
@@ -510,12 +517,34 @@ export class TransactionsService {
                 dueDate: { [Op.between]: [start, end] },
               },
             });
+      const recurringRevisions =
+        recurringContractIds.length === 0
+          ? []
+          : await this.recurringRevisionRepo.findAll({
+              where: {
+                contractId: { [Op.in]: recurringContractIds },
+                effectiveFrom: { [Op.lte]: end },
+              },
+              order: [
+                ['contractId', 'ASC'],
+                ['effectiveFrom', 'ASC'],
+              ],
+            });
 
       const overridesByContract = new Map<string, RecurringOccurrenceModel[]>();
       for (const override of recurringOverrides) {
         const list = overridesByContract.get(override.contractId) ?? [];
         list.push(override);
         overridesByContract.set(override.contractId, list);
+      }
+      const revisionsByContract = new Map<string, RecurringAmountRevision[]>();
+      for (const revision of recurringRevisions) {
+        const list = revisionsByContract.get(revision.contractId) ?? [];
+        list.push({
+          effectiveFrom: revision.effectiveFrom,
+          amount: String(revision.amount),
+        });
+        revisionsByContract.set(revision.contractId, list);
       }
 
       for (const contract of recurringContracts) {
@@ -526,9 +555,14 @@ export class TransactionsService {
           endDate,
         );
 
+        const revisions = revisionsByContract.get(contract.id) ?? [];
         const generated: ContractOccurrenceDto[] = dueDates.map((dueDate) => ({
           dueDate,
-          amount: String(contract.amount),
+          amount: resolveRecurringAmountByDate(
+            dueDate,
+            String(contract.amount),
+            revisions,
+          ),
           status: OccurrenceStatusEnum.Scheduled,
           transactionId: null,
           source: 'generated',

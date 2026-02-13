@@ -15,6 +15,7 @@ describe('TransactionsService', () => {
   let installmentOccurrenceRepo: any;
   let recurringOccurrenceRepo: any;
   let recurringContractRepo: any;
+  let recurringRevisionRepo: any;
   let walletFacade: any;
   let logger: any;
 
@@ -38,6 +39,9 @@ describe('TransactionsService', () => {
     recurringContractRepo = {
       findAll: jest.fn(),
     };
+    recurringRevisionRepo = {
+      findAll: jest.fn(),
+    };
     walletFacade = {
       adjustWalletBalance: jest.fn(),
       getWalletBalance: jest.fn(),
@@ -51,6 +55,7 @@ describe('TransactionsService', () => {
       installmentOccurrenceRepo as any,
       recurringOccurrenceRepo as any,
       recurringContractRepo as any,
+      recurringRevisionRepo as any,
       walletFacade as any,
       logger as any,
       transactionOfxService as any,

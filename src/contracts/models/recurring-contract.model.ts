@@ -23,6 +23,7 @@ import { ContractStatusEnum } from '../enums/contract-status.enum';
 import { RecurringOccurrenceModel } from './recurring-occurrence.model';
 import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+import { RecurringContractRevisionModel } from './recurring-contract-revision.model';
 
 @Table({ tableName: 'recurring_contracts' })
 export class RecurringContractModel extends Model<RecurringContractModel> {
@@ -139,4 +140,10 @@ export class RecurringContractModel extends Model<RecurringContractModel> {
     as: 'occurrences',
   })
   occurrences: RecurringOccurrenceModel[];
+
+  @HasMany(() => RecurringContractRevisionModel, {
+    foreignKey: 'contractId',
+    as: 'revisions',
+  })
+  revisions: RecurringContractRevisionModel[];
 }
