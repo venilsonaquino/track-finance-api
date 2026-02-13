@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { WalletsService } from 'src/wallets/wallets.service';
+import { WalletFinancialType } from 'src/wallets/enums/wallet-financial-type.enum';
 
 describe('WalletsService', () => {
   let service: WalletsService;
@@ -47,6 +48,34 @@ describe('WalletsService', () => {
     expect(walletModel.create).toHaveBeenCalledTimes(1);
     expect(result.balance).toBe(12.34);
     expect(result.userId).toBe('user-1');
+  });
+
+  it('forces balance to zero when creating a CREDIT_CARD wallet', async () => {
+    walletModel.create.mockResolvedValueOnce({
+      id: 'wallet-1',
+      name: 'Card',
+      description: 'Credit card',
+      walletType: 'Personal',
+      financialType: WalletFinancialType.CreditCard,
+      balance: 0,
+      userId: 'user-1',
+      bankId: null,
+    });
+
+    const result = await service.create(
+      {
+        name: 'Card',
+        description: 'Credit card',
+        walletType: 'Personal',
+        financialType: WalletFinancialType.CreditCard,
+        balance: 999.99,
+      } as any,
+      'user-1',
+    );
+
+    expect(walletModel.create).toHaveBeenCalledTimes(1);
+    expect(walletModel.create.mock.calls[0][0].balance).toBe(0);
+    expect(result.balance).toBe(0);
   });
 
   it('throws InternalServerErrorException when create fails', async () => {
@@ -136,5 +165,19 @@ describe('WalletsService', () => {
     expect(wallet.increment).toHaveBeenCalledWith('balance', { by: 1000 });
     expect(wallet.reload).toHaveBeenCalledTimes(1);
     expect(result.balance).toBe(10);
+  });
+
+  it('sums current balance using only ACCOUNT wallets', async () => {
+    walletModel.sum.mockResolvedValueOnce(1500);
+
+    const result = await service.findBalanceCurrent('user-1');
+
+    expect(walletModel.sum).toHaveBeenCalledWith('balance', {
+      where: {
+        userId: 'user-1',
+        financialType: WalletFinancialType.Account,
+      },
+    });
+    expect(result).toBe(15);
   });
 });

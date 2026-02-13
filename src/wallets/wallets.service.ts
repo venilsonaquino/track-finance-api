@@ -27,8 +27,15 @@ export class WalletsService {
     userId: string,
   ): Promise<WalletResponseDto> {
     try {
+      const financialType =
+        createWalletDto.financialType ?? WalletFinancialType.Account;
+      const normalizedBalance =
+        financialType === WalletFinancialType.CreditCard
+          ? 0
+          : createWalletDto.balance;
+
       this.logger.log(
-        `Creating wallet user=${userId} name=${createWalletDto.name} initialBalance=${createWalletDto.balance}`,
+        `Creating wallet user=${userId} name=${createWalletDto.name} initialBalance=${normalizedBalance}`,
         WalletsService.name,
       );
 
@@ -36,9 +43,8 @@ export class WalletsService {
         name: createWalletDto.name,
         description: createWalletDto.description,
         walletType: createWalletDto.walletType,
-        financialType:
-          createWalletDto.financialType ?? WalletFinancialType.Account,
-        balance: createWalletDto.balance,
+        financialType,
+        balance: normalizedBalance,
         userId: userId,
         bankId: createWalletDto.bankId || null,
         dueDay: createWalletDto.dueDay ?? null,
@@ -84,8 +90,15 @@ export class WalletsService {
     updateWalletDto: UpdateWalletDto,
     userId: string,
   ): Promise<WalletResponseDto> {
+    const financialType =
+      updateWalletDto.financialType ?? WalletFinancialType.Account;
+    const normalizedBalance =
+      financialType === WalletFinancialType.CreditCard
+        ? 0
+        : updateWalletDto.balance;
+
     this.logger.log(
-      `Updating wallet id=${id} user=${userId} name=${updateWalletDto.name} balance=${updateWalletDto.balance}`,
+      `Updating wallet id=${id} user=${userId} name=${updateWalletDto.name} balance=${normalizedBalance}`,
       WalletsService.name,
     );
 
@@ -93,9 +106,8 @@ export class WalletsService {
       name: updateWalletDto.name,
       description: updateWalletDto.description,
       walletType: updateWalletDto.walletType,
-      financialType:
-        updateWalletDto.financialType ?? WalletFinancialType.Account,
-      balance: updateWalletDto.balance,
+      financialType,
+      balance: normalizedBalance,
       userId: userId,
       bankId: updateWalletDto.bankId || null,
       dueDay: updateWalletDto.dueDay ?? null,
@@ -132,7 +144,10 @@ export class WalletsService {
 
   async findBalanceCurrent(userId: string): Promise<number> {
     const totalBalance = await this.walletModel.sum('balance', {
-      where: { userId },
+      where: {
+        userId,
+        financialType: WalletFinancialType.Account,
+      },
     });
     return MoneyHelper.centsToAmount(totalBalance || 0);
   }
