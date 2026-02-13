@@ -16,6 +16,7 @@ describe('ContractsService', () => {
   let recurringContractRepo: any;
   let recurringOccurrenceRepo: any;
   let recurringRevisionRepo: any;
+  let cardStatementRepo: any;
   let walletRepo: any;
   let categoryRepo: any;
   let transactionRepo: any;
@@ -32,15 +33,18 @@ describe('ContractsService', () => {
     occurrenceRepo = {
       bulkCreate: jest.fn(),
       findOne: jest.fn(),
+      findAll: jest.fn(),
       update: jest.fn(),
     };
     recurringContractRepo = {
       create: jest.fn(),
       findOne: jest.fn(),
+      findAll: jest.fn(async () => []),
     };
     recurringOccurrenceRepo = {
       findOne: jest.fn(),
       findAll: jest.fn(),
+      bulkCreate: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),
     };
@@ -48,6 +52,10 @@ describe('ContractsService', () => {
       create: jest.fn(),
       findOne: jest.fn(),
       findAll: jest.fn(async () => []),
+    };
+    cardStatementRepo = {
+      findOne: jest.fn(),
+      create: jest.fn(),
     };
     walletRepo = {
       findOne: jest.fn(),
@@ -69,6 +77,7 @@ describe('ContractsService', () => {
       recurringContractRepo,
       recurringOccurrenceRepo,
       recurringRevisionRepo,
+      cardStatementRepo,
       walletRepo,
       categoryRepo,
       transactionRepo,
@@ -336,6 +345,10 @@ describe('ContractsService', () => {
       amount: '100.00',
       transactionType: 'EXPENSE',
     });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: 'ACCOUNT',
+    });
 
     const result = await service.payInstallmentOccurrence(
       'contract-1',
@@ -376,6 +389,10 @@ describe('ContractsService', () => {
       id: 'tx-2',
       amount: '50.00',
       transactionType: 'EXPENSE',
+    });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: 'ACCOUNT',
     });
 
     const result = await service.payRecurringOccurrence(
@@ -509,6 +526,10 @@ describe('ContractsService', () => {
       id: 'tx-3',
       amount: '50.00',
       transactionType: 'EXPENSE',
+    });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: 'ACCOUNT',
     });
 
     const result = await service.payRecurringOccurrence(
@@ -832,4 +853,143 @@ describe('ContractsService', () => {
       service.getRecurringContractDetails('missing-rec', 'user-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('pays card statement with body using default payment account from card', async () => {
+    walletRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'card-1',
+        name: 'Cartao XPTO',
+        dueDay: 12,
+        financialType: 'CREDIT_CARD',
+        paymentAccountWalletId: 'acc-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'acc-1',
+        financialType: 'ACCOUNT',
+      });
+    occurrenceRepo.findAll.mockResolvedValueOnce([
+      {
+        id: 'inst-1',
+        amount: '120.00',
+        installmentStatus: OccurrenceStatusEnum.Scheduled,
+        contract: { categoryId: 'cat-1' },
+      },
+    ]);
+    recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-stmt-1',
+      amount: '120.00',
+      transactionType: 'EXPENSE',
+    });
+    cardStatementRepo.findOne.mockResolvedValueOnce(null);
+    cardStatementRepo.create.mockResolvedValueOnce({ id: 'stmt-1' });
+
+    const result = await service.payCardStatement(
+      'card-1',
+      2026,
+      2,
+      { depositedDate: '2026-02-12' } as any,
+      'user-1',
+    );
+
+    expect(transactionRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: 'acc-1',
+        cardWalletId: 'card-1',
+        categoryId: 'cat-1',
+      }),
+      expect.any(Object),
+    );
+    expect(walletFacade.adjustWalletBalance).toHaveBeenCalledTimes(1);
+    expect(result.paymentTransaction.id).toBe('tx-stmt-1');
+  });
+
+  it('throws BadRequestException when statement payment has no default account and no paymentWalletId', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'card-1',
+      name: 'Cartao XPTO',
+      dueDay: 12,
+      financialType: 'CREDIT_CARD',
+      paymentAccountWalletId: null,
+    });
+    occurrenceRepo.findAll.mockResolvedValueOnce([
+      {
+        id: 'inst-1',
+        amount: '120.00',
+        installmentStatus: OccurrenceStatusEnum.Scheduled,
+        contract: { categoryId: 'cat-1' },
+      },
+    ]);
+    recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
+
+    await expect(
+      service.payCardStatement(
+        'card-1',
+        2026,
+        2,
+        { depositedDate: '2026-02-12' } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('pays statement using generated recurring occurrences when no override row exists', async () => {
+    walletRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'card-1',
+        name: 'Cartao Nubank',
+        dueDay: 12,
+        financialType: 'CREDIT_CARD',
+        paymentAccountWalletId: 'acc-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'acc-1',
+        financialType: 'ACCOUNT',
+      });
+
+    occurrenceRepo.findAll.mockResolvedValueOnce([]);
+    recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
+    recurringContractRepo.findAll.mockResolvedValueOnce([
+      {
+        id: 'rec-1',
+        walletId: 'card-1',
+        userId: 'user-1',
+        categoryId: 'cat-1',
+        amount: '69.90',
+        installmentInterval: IntervalEnum.Monthly,
+        firstDueDate: '2026-02-12',
+        endsAt: null,
+        status: ContractStatusEnum.Active,
+      },
+    ]);
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-stmt-1',
+      amount: '69.90',
+      transactionType: 'EXPENSE',
+    });
+    cardStatementRepo.findOne.mockResolvedValueOnce(null);
+    cardStatementRepo.create.mockResolvedValueOnce({ id: 'stmt-1' });
+
+    const result = await service.payCardStatement(
+      'card-1',
+      2026,
+      3,
+      { depositedDate: '2026-03-12' } as any,
+      'user-1',
+    );
+
+    expect(recurringOccurrenceRepo.bulkCreate).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          contractId: 'rec-1',
+          dueDate: '2026-03-12',
+          amount: '69.90',
+          status: OccurrenceStatusEnum.Closed,
+        }),
+      ],
+      expect.any(Object),
+    );
+    expect(result.paymentTransaction.id).toBe('tx-stmt-1');
+  });
+
 });

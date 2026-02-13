@@ -33,6 +33,7 @@ import { TransactionModel } from 'src/transactions/models/transaction.model';
 import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
 import { TransactionEntity } from 'src/transactions/entities/transaction.entity';
 import { GetInstallmentContractDetailsResponseDto } from './dtos/get-installment-contract-details-response.dto';
 import { GetRecurringContractDetailsResponseDto } from './dtos/get-recurring-contract-details-response.dto';
@@ -42,6 +43,10 @@ import {
   RecurringAmountRevision,
   resolveRecurringAmountByDate,
 } from './utils/resolve-recurring-amount-by-date';
+import { WalletFinancialType } from 'src/wallets/enums/wallet-financial-type.enum';
+import { CardStatementModel } from './models/card-statement.model';
+import { CardStatementStatusEnum } from './enums/card-statement-status.enum';
+import { PayCardStatementDto } from './dtos/pay-card-statement.dto';
 
 @Injectable()
 export class ContractsService {
@@ -57,6 +62,8 @@ export class ContractsService {
     private readonly recurringOccurrenceRepo: typeof RecurringOccurrenceModel,
     @InjectModel(RecurringContractRevisionModel)
     private readonly recurringRevisionRepo: typeof RecurringContractRevisionModel,
+    @InjectModel(CardStatementModel)
+    private readonly cardStatementRepo: typeof CardStatementModel,
     @InjectModel(WalletModel)
     private readonly walletRepo: typeof WalletModel,
     @InjectModel(CategoryModel)
@@ -715,6 +722,251 @@ export class ContractsService {
     return { contract };
   }
 
+  async getCardStatementPreview(
+    cardWalletId: string,
+    year: number,
+    month: number,
+    userId: string,
+  ) {
+    this.validateYearMonth(year, month);
+    const cardWallet = await this.ensureCreditCardWallet(cardWalletId, userId);
+    const period = this.buildReferencePeriod(year, month);
+    const dueDate = this.resolveCardDueDate(year, month, cardWallet.dueDay);
+
+    const {
+      installmentOccurrences,
+      recurringOccurrences,
+      generatedRecurringOccurrences,
+    } = await this.fetchCardOccurrencesForPeriod(cardWalletId, userId, period);
+    const allItems = [
+      ...installmentOccurrences.map((occ) => ({
+        id: occ.id,
+        source: 'installment' as const,
+        contractId: occ.contractId,
+        dueDate: occ.dueDate,
+        amount: String(occ.amount),
+        status: occ.installmentStatus,
+      })),
+      ...recurringOccurrences.map((occ) => ({
+        id: occ.id,
+        source: 'recurring' as const,
+        contractId: occ.contractId,
+        dueDate: occ.dueDate,
+        amount: String(occ.amount),
+        status: occ.status,
+      })),
+      ...generatedRecurringOccurrences.map((occ) => ({
+        id: occ.id,
+        source: 'recurring' as const,
+        contractId: occ.contractId,
+        dueDate: occ.dueDate,
+        amount: String(occ.amount),
+        status: occ.status,
+      })),
+    ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+    const payableStatuses = new Set([
+      OccurrenceStatusEnum.Scheduled,
+      OccurrenceStatusEnum.Paused,
+    ]);
+    const payableItems = allItems.filter((item) => payableStatuses.has(item.status));
+    const totalAmount = payableItems.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0,
+    );
+
+    const existingStatement = await this.cardStatementRepo.findOne({
+      where: { cardWalletId, referenceMonth: period.referenceMonth },
+    });
+
+    return {
+      statement: {
+        id: existingStatement?.id ?? null,
+        cardWalletId,
+        cardWalletName: cardWallet.name,
+        referenceMonth: period.referenceMonth,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        dueDate,
+        status: existingStatement?.status ?? CardStatementStatusEnum.Open,
+        totalAmount: totalAmount.toFixed(2),
+        paymentWalletId:
+          existingStatement?.paymentWalletId ??
+          cardWallet.paymentAccountWalletId ??
+          null,
+        paymentTransactionId: existingStatement?.paymentTransactionId ?? null,
+      },
+      items: allItems,
+    };
+  }
+
+  async payCardStatement(
+    cardWalletId: string,
+    year: number,
+    month: number,
+    dto: PayCardStatementDto,
+    userId: string,
+  ) {
+    this.validateYearMonth(year, month);
+    const cardWallet = await this.ensureCreditCardWallet(cardWalletId, userId);
+    const period = this.buildReferencePeriod(year, month);
+    const dueDate = this.resolveCardDueDate(year, month, cardWallet.dueDay);
+
+    const {
+      installmentOccurrences,
+      recurringOccurrences,
+      generatedRecurringOccurrences,
+    } = await this.fetchCardOccurrencesForPeriod(cardWalletId, userId, period);
+
+    const payableInstallments = installmentOccurrences.filter(
+      (occ) =>
+        occ.installmentStatus === OccurrenceStatusEnum.Scheduled ||
+        occ.installmentStatus === OccurrenceStatusEnum.Paused,
+    );
+    const payableRecurring = recurringOccurrences.filter(
+      (occ) =>
+        occ.status === OccurrenceStatusEnum.Scheduled ||
+        occ.status === OccurrenceStatusEnum.Paused,
+    );
+    const payableGeneratedRecurring = generatedRecurringOccurrences.filter(
+      (occ) =>
+        occ.status === OccurrenceStatusEnum.Scheduled ||
+        occ.status === OccurrenceStatusEnum.Paused,
+    );
+
+    const totalAmount =
+      payableInstallments.reduce((sum, occ) => sum + Number(occ.amount), 0) +
+      payableRecurring.reduce((sum, occ) => sum + Number(occ.amount), 0) +
+      payableGeneratedRecurring.reduce((sum, occ) => sum + Number(occ.amount), 0);
+
+    if (totalAmount <= 0) {
+      throw new BadRequestException('There are no payable items in this statement.');
+    }
+
+    const paymentWalletId = dto.paymentWalletId ?? cardWallet.paymentAccountWalletId;
+    if (!paymentWalletId) {
+      throw new BadRequestException(
+        'paymentWalletId is required when card has no default payment account.',
+      );
+    }
+
+    const inferredCategoryId =
+      payableInstallments[0]?.contract?.categoryId ??
+      payableRecurring[0]?.contract?.categoryId ??
+      payableGeneratedRecurring[0]?.contract?.categoryId ??
+      null;
+    const categoryId = dto.categoryId ?? inferredCategoryId;
+    if (!categoryId) {
+      throw new BadRequestException(
+        'categoryId is required when it cannot be inferred from statement items.',
+      );
+    }
+
+    const paymentWallet = await this.walletRepo.findOne({
+      where: { id: paymentWalletId, userId },
+    });
+    if (!paymentWallet) {
+      throw new NotFoundException('Payment account wallet not found.');
+    }
+    if (paymentWallet.financialType !== WalletFinancialType.Account) {
+      throw new BadRequestException('paymentWalletId must be an ACCOUNT wallet.');
+    }
+
+    const description =
+      dto.description ??
+      `Pagamento fatura ${cardWallet.name} ${period.referenceMonth.slice(0, 7)}`;
+    const depositedDate = dto.depositedDate;
+
+    return this.sequelize.transaction(async (transaction) => {
+      const paymentTransaction = await this.transactionRepo.create(
+        {
+          depositedDate,
+          description,
+          amount: totalAmount.toFixed(2),
+          transactionType: TransactionType.Expense,
+          transactionStatus: TransactionStatus.Posted,
+          userId,
+          categoryId,
+          walletId: paymentWalletId,
+          cardWalletId,
+        },
+        { transaction },
+      );
+
+      if (payableInstallments.length > 0) {
+        await this.occurrenceRepo.update(
+          { installmentStatus: OccurrenceStatusEnum.Closed, transactionId: null },
+          {
+            where: { id: { [Op.in]: payableInstallments.map((occ) => occ.id) } },
+            transaction,
+          },
+        );
+      }
+
+      if (payableRecurring.length > 0) {
+        await this.recurringOccurrenceRepo.update(
+          { status: OccurrenceStatusEnum.Closed, transactionId: null },
+          {
+            where: { id: { [Op.in]: payableRecurring.map((occ) => occ.id) } },
+            transaction,
+          },
+        );
+      }
+
+      if (payableGeneratedRecurring.length > 0) {
+        await this.recurringOccurrenceRepo.bulkCreate(
+          payableGeneratedRecurring.map((occ) => ({
+            contractId: occ.contractId,
+            dueDate: occ.dueDate,
+            amount: String(occ.amount),
+            status: OccurrenceStatusEnum.Closed,
+            transactionId: null,
+          })),
+          { transaction },
+        );
+      }
+
+      const existingStatement = await this.cardStatementRepo.findOne({
+        where: {
+          cardWalletId,
+          referenceMonth: period.referenceMonth,
+        },
+        transaction,
+      });
+
+      const statementPayload = {
+        userId,
+        cardWalletId,
+        referenceMonth: period.referenceMonth,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        dueDate,
+        totalAmount: totalAmount.toFixed(2),
+        status: CardStatementStatusEnum.Paid,
+        paymentWalletId,
+        paymentTransactionId: paymentTransaction.id,
+        paidAt: depositedDate,
+      };
+
+      if (existingStatement) {
+        await existingStatement.update(statementPayload, { transaction });
+      } else {
+        await this.cardStatementRepo.create(statementPayload, { transaction });
+      }
+
+      const delta = TransactionEntity.resolveBalanceDelta(
+        Number(paymentTransaction.amount),
+        paymentTransaction.transactionType,
+      );
+      await this.walletFacade.adjustWalletBalance(paymentWalletId, userId, delta);
+
+      return {
+        statement: statementPayload,
+        paymentTransaction,
+      };
+    });
+  }
+
   async getContractById(contractId: string, userId: string) {
     const contract = await this.recurringContractRepo.findOne({
       where: { id: contractId, userId },
@@ -986,7 +1238,8 @@ export class ContractsService {
     if (
       occurrence.installmentStatus === OccurrenceStatusEnum.Cancelled ||
       occurrence.installmentStatus === OccurrenceStatusEnum.Skipped ||
-      occurrence.installmentStatus === OccurrenceStatusEnum.Paused
+      occurrence.installmentStatus === OccurrenceStatusEnum.Paused ||
+      occurrence.installmentStatus === OccurrenceStatusEnum.Closed
     ) {
       throw new BadRequestException('Occurrence is not payable.');
     }
@@ -1031,7 +1284,15 @@ export class ContractsService {
         Number(created.amount),
         created.transactionType,
       );
-      await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
+      const contractWallet = await this.walletRepo.findOne({
+        where: { id: contract.walletId, userId },
+      });
+      if (
+        contractWallet &&
+        contractWallet.financialType === WalletFinancialType.Account
+      ) {
+        await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
+      }
 
       return {
         transaction: created,
@@ -1085,7 +1346,8 @@ export class ContractsService {
     if (
       existingOccurrence?.status === OccurrenceStatusEnum.Cancelled ||
       existingOccurrence?.status === OccurrenceStatusEnum.Skipped ||
-      existingOccurrence?.status === OccurrenceStatusEnum.Paused
+      existingOccurrence?.status === OccurrenceStatusEnum.Paused ||
+      existingOccurrence?.status === OccurrenceStatusEnum.Closed
     ) {
       throw new BadRequestException('Occurrence is not payable.');
     }
@@ -1146,7 +1408,15 @@ export class ContractsService {
         Number(created.amount),
         created.transactionType,
       );
-      await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
+      const contractWallet = await this.walletRepo.findOne({
+        where: { id: contract.walletId, userId },
+      });
+      if (
+        contractWallet &&
+        contractWallet.financialType === WalletFinancialType.Account
+      ) {
+        await this.walletFacade.adjustWalletBalance(contract.walletId, userId, delta);
+      }
 
       return {
         transaction: created,
@@ -1193,6 +1463,172 @@ export class ContractsService {
     });
   }
 
+  private validateYearMonth(year: number, month: number) {
+    if (!Number.isInteger(year) || year < 1970 || year > 9999) {
+      throw new BadRequestException('Invalid year.');
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new BadRequestException('Invalid month.');
+    }
+  }
+
+  private buildReferencePeriod(year: number, month: number) {
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 0));
+    return {
+      referenceMonth: startDate.toISOString().slice(0, 10),
+      periodStart: startDate.toISOString().slice(0, 10),
+      periodEnd: endDate.toISOString().slice(0, 10),
+    };
+  }
+
+  private resolveCardDueDate(
+    year: number,
+    month: number,
+    dueDay: number | null | undefined,
+  ): string {
+    const resolvedDueDay = dueDay ?? 1;
+    const monthLastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const safeDay = Math.min(Math.max(resolvedDueDay, 1), monthLastDay);
+    return new Date(Date.UTC(year, month - 1, safeDay)).toISOString().slice(0, 10);
+  }
+
+  private async ensureCreditCardWallet(cardWalletId: string, userId: string) {
+    const wallet = await this.walletRepo.findOne({
+      where: { id: cardWalletId, userId },
+    });
+    if (!wallet) {
+      throw new NotFoundException('Card wallet not found.');
+    }
+    if (wallet.financialType !== WalletFinancialType.CreditCard) {
+      throw new BadRequestException('Wallet is not CREDIT_CARD.');
+    }
+    return wallet;
+  }
+
+  private async fetchCardOccurrencesForPeriod(
+    cardWalletId: string,
+    userId: string,
+    period: { periodStart: string; periodEnd: string },
+  ) {
+    const [installmentOccurrences, recurringOccurrences, recurringContracts] =
+      await Promise.all([
+        this.occurrenceRepo.findAll({
+          where: {
+            dueDate: { [Op.between]: [period.periodStart, period.periodEnd] },
+            installmentStatus: {
+              [Op.in]: [
+                OccurrenceStatusEnum.Scheduled,
+                OccurrenceStatusEnum.Paused,
+                OccurrenceStatusEnum.Closed,
+              ],
+            },
+            transactionId: null,
+          },
+          include: [
+            {
+              model: InstallmentContractModel,
+              as: 'contract',
+              where: { walletId: cardWalletId, userId },
+              required: true,
+            },
+          ],
+        }),
+        this.recurringOccurrenceRepo.findAll({
+          where: {
+            dueDate: { [Op.between]: [period.periodStart, period.periodEnd] },
+            status: {
+              [Op.in]: [
+                OccurrenceStatusEnum.Scheduled,
+                OccurrenceStatusEnum.Paused,
+                OccurrenceStatusEnum.Closed,
+              ],
+            },
+            transactionId: null,
+          },
+          include: [
+            {
+              model: RecurringContractModel,
+              as: 'contract',
+              where: { walletId: cardWalletId, userId },
+              required: true,
+            },
+          ],
+        }),
+        this.recurringContractRepo.findAll({
+          where: {
+            walletId: cardWalletId,
+            userId,
+            status: ContractStatusEnum.Active,
+          },
+        }),
+      ]);
+
+    const fromDate = parseIsoDateOnly(period.periodStart);
+    const toDate = parseIsoDateOnly(period.periodEnd);
+    const generatedRecurringOccurrences: Array<{
+      id: null;
+      contractId: string;
+      dueDate: string;
+      amount: string;
+      status: OccurrenceStatusEnum;
+      contract: { categoryId: string };
+    }> = [];
+
+    if (fromDate && toDate && recurringContracts.length > 0) {
+      const existingRecurringKeys = new Set(
+        recurringOccurrences.map((occ) => `${occ.contractId}:${occ.dueDate}`),
+      );
+
+      for (const contract of recurringContracts) {
+        if (contract.endsAt && contract.endsAt < period.periodStart) {
+          continue;
+        }
+
+        const dueDates = generateDueDatesInRange(
+          contract.firstDueDate,
+          contract.installmentInterval,
+          fromDate,
+          toDate,
+        );
+        const revisions = await this.listContractRevisionsUntil(
+          contract.id,
+          period.periodEnd,
+        );
+
+        for (const dueDate of dueDates) {
+          if (contract.endsAt && dueDate > contract.endsAt) {
+            continue;
+          }
+
+          const occurrenceKey = `${contract.id}:${dueDate}`;
+          if (existingRecurringKeys.has(occurrenceKey)) {
+            continue;
+          }
+
+          generatedRecurringOccurrences.push({
+            id: null,
+            contractId: contract.id,
+            dueDate,
+            amount: this.resolveContractAmountAtDueDate(
+              dueDate,
+              String(contract.amount),
+              revisions,
+            ),
+            status: OccurrenceStatusEnum.Scheduled,
+            contract: { categoryId: contract.categoryId },
+          });
+        }
+      }
+    }
+
+    return {
+      installmentOccurrences,
+      recurringOccurrences,
+      generatedRecurringOccurrences,
+    };
+  }
+
   private generateUpcomingRecurringOccurrences(
     contract: RecurringContractModel,
     revisions: RecurringAmountRevision[],
@@ -1237,6 +1673,7 @@ export class ContractsService {
         }
         if (
           override.status === OccurrenceStatusEnum.Paused ||
+          override.status === OccurrenceStatusEnum.Closed ||
           override.status === OccurrenceStatusEnum.Skipped ||
           override.status === OccurrenceStatusEnum.Cancelled
         ) {
@@ -1290,7 +1727,7 @@ export class ContractsService {
   private resolveOccurrenceStatus(
     occurrenceStatus: OccurrenceStatusEnum | null | undefined,
     transactionStatus: TransactionStatus | null,
-  ): 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' | 'PAUSED' {
+  ): 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' | 'PAUSED' | 'CLOSED' {
     if (occurrenceStatus === OccurrenceStatusEnum.Posted) {
       if (transactionStatus === TransactionStatus.Reversed) {
         return 'REVERSED';
@@ -1308,6 +1745,10 @@ export class ContractsService {
 
     if (occurrenceStatus === OccurrenceStatusEnum.Paused) {
       return 'PAUSED';
+    }
+
+    if (occurrenceStatus === OccurrenceStatusEnum.Closed) {
+      return 'CLOSED';
     }
 
     return 'FUTURE';

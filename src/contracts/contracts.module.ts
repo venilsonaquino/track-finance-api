@@ -7,6 +7,7 @@ import { ContractsController } from './contracts.controller';
 import { RecurringContractModel } from './models/recurring-contract.model';
 import { RecurringOccurrenceModel } from './models/recurring-occurrence.model';
 import { RecurringContractRevisionModel } from './models/recurring-contract-revision.model';
+import { CardStatementModel } from './models/card-statement.model';
 import { WalletModel } from 'src/wallets/models/wallet.model';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { TransactionModel } from 'src/transactions/models/transaction.model';
@@ -21,6 +22,7 @@ import { TransactionsModule } from 'src/transactions/transactions.module';
       RecurringContractModel,
       RecurringOccurrenceModel,
       RecurringContractRevisionModel,
+      CardStatementModel,
       WalletModel,
       CategoryModel,
       TransactionModel,

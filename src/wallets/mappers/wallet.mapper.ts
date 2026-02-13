@@ -10,9 +10,13 @@ export class WalletMapper {
       name: model.name,
       description: model.description,
       walletType: model.walletType,
+      financialType: model.financialType,
       balance: model.balance,
       userId: model.userId,
       bankId: model.bankId,
+      dueDay: model.dueDay,
+      closingDay: model.closingDay,
+      paymentAccountWalletId: model.paymentAccountWalletId,
     });
   }
 
@@ -22,9 +26,13 @@ export class WalletMapper {
       name: model.name,
       description: model.description,
       walletType: model.walletType,
+      financialType: model.financialType,
       balance: MoneyHelper.centsToAmount(model.balance),
       userId: model.userId,
       bankId: model.bankId,
+      dueDay: model.dueDay ?? null,
+      closingDay: model.closingDay ?? null,
+      paymentAccountWalletId: model.paymentAccountWalletId ?? null,
     };
   }
 }

@@ -12,6 +12,7 @@ import MoneyHelper from './helpers/money.helper';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { WalletResponseDto } from './dto/wallet-response.dto';
 import { WalletMapper } from './mappers/wallet.mapper';
+import { WalletFinancialType } from './enums/wallet-financial-type.enum';
 
 @Injectable()
 export class WalletsService {
@@ -35,9 +36,14 @@ export class WalletsService {
         name: createWalletDto.name,
         description: createWalletDto.description,
         walletType: createWalletDto.walletType,
+        financialType:
+          createWalletDto.financialType ?? WalletFinancialType.Account,
         balance: createWalletDto.balance,
         userId: userId,
         bankId: createWalletDto.bankId || null,
+        dueDay: createWalletDto.dueDay ?? null,
+        closingDay: createWalletDto.closingDay ?? null,
+        paymentAccountWalletId: createWalletDto.paymentAccountWalletId ?? null,
       });
 
       const created = await this.walletModel.create(walletEntity);
@@ -87,9 +93,14 @@ export class WalletsService {
       name: updateWalletDto.name,
       description: updateWalletDto.description,
       walletType: updateWalletDto.walletType,
+      financialType:
+        updateWalletDto.financialType ?? WalletFinancialType.Account,
       balance: updateWalletDto.balance,
       userId: userId,
       bankId: updateWalletDto.bankId || null,
+      dueDay: updateWalletDto.dueDay ?? null,
+      closingDay: updateWalletDto.closingDay ?? null,
+      paymentAccountWalletId: updateWalletDto.paymentAccountWalletId ?? null,
     });
 
     const [affectedCount, updated] = await this.walletModel.update(

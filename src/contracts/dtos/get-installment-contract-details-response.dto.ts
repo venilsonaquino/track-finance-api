@@ -5,7 +5,14 @@ export class InstallmentContractInstallmentItemDto {
   installmentIndex: number;
   dueDate: string;
   amount: string;
-  status: 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' | 'PAUSED';
+  status:
+    | 'PAID'
+    | 'FUTURE'
+    | 'REVERSED'
+    | 'CANCELLED'
+    | 'SKIPPED'
+    | 'PAUSED'
+    | 'CLOSED';
   transactionId: string | null;
   transactionStatus: TransactionStatus | null;
 }

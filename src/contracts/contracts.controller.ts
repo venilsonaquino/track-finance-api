@@ -15,6 +15,7 @@ import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto
 import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
 import { UpdateOccurrenceAmountDto } from './dtos/update-occurrence-amount.dto';
+import { PayCardStatementDto } from './dtos/pay-card-statement.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -189,5 +190,37 @@ export class ContractsController {
     @CurrentUser() user: any,
   ) {
     return this.service.getRecurringContractDetails(contractId, user.id);
+  }
+
+  @Get('cards/:cardWalletId/statements/:year/:month')
+  async getCardStatement(
+    @Param('cardWalletId') cardWalletId: string,
+    @Param('year') year: string,
+    @Param('month') month: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.getCardStatementPreview(
+      cardWalletId,
+      Number(year),
+      Number(month),
+      user.id,
+    );
+  }
+
+  @Post('cards/:cardWalletId/statements/:year/:month/pay')
+  async payCardStatement(
+    @Param('cardWalletId') cardWalletId: string,
+    @Param('year') year: string,
+    @Param('month') month: string,
+    @Body() dto: PayCardStatementDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.payCardStatement(
+      cardWalletId,
+      Number(year),
+      Number(month),
+      dto,
+      user.id,
+    );
   }
 }

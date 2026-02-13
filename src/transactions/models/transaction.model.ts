@@ -129,6 +129,15 @@ export class TransactionModel extends Model<TransactionModel> {
   })
   walletId: string;
 
+  @ForeignKey(() => WalletModel)
+  @Column({
+    field: 'card_wallet_id',
+    type: DataType.STRING(26),
+    allowNull: true,
+    defaultValue: null,
+  })
+  cardWalletId?: string | null;
+
   @BelongsTo(() => UserModel)
   user: UserEntity;
 

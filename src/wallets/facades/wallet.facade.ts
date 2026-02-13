@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { WalletsService } from '../wallets.service';
 import { CreateWalletDto } from '../dto/create-wallet.dto';
 import { WalletResponseDto } from '../dto/wallet-response.dto';
+import { WalletFinancialType } from '../enums/wallet-financial-type.enum';
 
 @Injectable()
 export class WalletFacade {
@@ -17,6 +18,7 @@ export class WalletFacade {
     walletDto.name = 'MainWallet';
     walletDto.description = 'Main Wallet';
     walletDto.walletType = 'Personal';
+    walletDto.financialType = WalletFinancialType.Account;
     walletDto.balance = 0;
     walletDto.bankId = null;
 
