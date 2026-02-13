@@ -26,6 +26,7 @@ import {
   MovementItemDto,
   MovementsMonthlyResponseDto,
   MovementSource,
+  MovementStatus,
 } from './dto/movements-response.dto';
 import { CategoryModel } from 'src/categories/models/category.model';
 import { WalletModel } from 'src/wallets/models/wallet.model';
@@ -663,15 +664,23 @@ export class TransactionsService {
   private mapTransactionToMovement(
     transaction: TransactionModel,
   ): MovementItemDto {
+    const source = this.resolveMovementSource({
+      transaction,
+      wallet: transaction.wallet,
+    });
+
     return {
       id: transaction.id,
       transactionId: transaction.id,
       date: transaction.depositedDate,
       description: transaction.description,
       amount: Number(transaction.amount),
-      transactionType: transaction.transactionType,
-      transactionStatus: transaction.transactionStatus,
-      source: 'transaction',
+      status: this.resolveMovementStatus({
+        transactionStatus: transaction.transactionStatus,
+        occurrenceStatus: null,
+      }),
+      direction: transaction.transactionType,
+      source,
       category: transaction.category
         ? { id: transaction.category.id, name: transaction.category.name }
         : undefined,
@@ -679,10 +688,10 @@ export class TransactionsService {
         ? { id: transaction.wallet.id, name: transaction.wallet.name }
         : undefined,
       actions: this.resolveMovementActions({
-        source: 'transaction',
         occurrenceStatus: null,
         transactionStatus: transaction.transactionStatus,
         hasContract: false,
+        contractType: null,
       }),
     };
   }
@@ -690,17 +699,23 @@ export class TransactionsService {
   private mapOccurrenceToMovement(
     occurrence: InstallmentOccurrenceModel | RecurringOccurrenceModel,
     transaction: TransactionModel | undefined,
-    source: MovementSource,
+    occurrenceKind: 'installment' | 'recurring',
   ): MovementItemDto | null {
     if (!transaction) {
       return null;
     }
 
     const rawStatus =
-      source === 'installment'
+      occurrenceKind === 'installment'
         ? (occurrence as InstallmentOccurrenceModel).installmentStatus
         : (occurrence as RecurringOccurrenceModel).status;
     const occurrenceStatus = this.resolveOccurrenceStatus(rawStatus);
+    const contractType =
+      occurrenceKind === 'installment' ? 'INSTALLMENT' : 'RECURRING';
+    const source = this.resolveMovementSource({
+      transaction,
+      wallet: transaction.wallet,
+    });
 
     return {
       id: occurrence.id,
@@ -708,8 +723,11 @@ export class TransactionsService {
       date: occurrence.dueDate,
       description: transaction.description,
       amount: Number(transaction.amount),
-      transactionType: transaction.transactionType,
-      transactionStatus: transaction.transactionStatus,
+      status: this.resolveMovementStatus({
+        transactionStatus: transaction.transactionStatus,
+        occurrenceStatus,
+      }),
+      direction: transaction.transactionType,
       source,
       category: transaction.category
         ? { id: transaction.category.id, name: transaction.category.name }
@@ -721,13 +739,13 @@ export class TransactionsService {
       occurrenceId: occurrence.id,
       installmentIndex: (occurrence as any).installmentIndex,
       dueDate: occurrence.dueDate,
-      contractType: source === 'installment' ? 'INSTALLMENT' : 'RECURRING',
+      contractType,
       occurrenceStatus,
       actions: this.resolveMovementActions({
-        source,
         occurrenceStatus,
         transactionStatus: transaction.transactionStatus,
         hasContract: true,
+        contractType,
       }),
     };
   }
@@ -743,6 +761,9 @@ export class TransactionsService {
     const occurrenceStatus = this.resolveOccurrenceStatus(
       occurrence.installmentStatus,
     );
+    const source = this.resolveMovementSource({
+      wallet: contract?.wallet,
+    });
 
     return {
       id: occurrence.id,
@@ -750,9 +771,12 @@ export class TransactionsService {
       date: occurrence.dueDate,
       description,
       amount: Number(occurrence.amount),
-      transactionType: contract?.transactionType ?? null,
-      transactionStatus: null,
-      source: 'installment',
+      status: this.resolveMovementStatus({
+        transactionStatus: null,
+        occurrenceStatus,
+      }),
+      direction: contract?.transactionType ?? null,
+      source,
       category: contract?.category
         ? { id: contract.category.id, name: contract.category.name }
         : undefined,
@@ -766,10 +790,10 @@ export class TransactionsService {
       contractType: 'INSTALLMENT',
       occurrenceStatus,
       actions: this.resolveMovementActions({
-        source: 'installment',
         occurrenceStatus,
         transactionStatus: null,
         hasContract: true,
+        contractType: 'INSTALLMENT',
       }),
     };
   }
@@ -784,6 +808,9 @@ export class TransactionsService {
     const occurrenceStatus = this.resolveOccurrenceStatus(
       occurrence.status,
     );
+    const source = this.resolveMovementSource({
+      wallet: contract.wallet,
+    });
 
     return {
       id: `recurring:${contract.id}:${occurrence.dueDate}`,
@@ -791,9 +818,12 @@ export class TransactionsService {
       date: occurrence.dueDate,
       description,
       amount: Number(occurrence.amount),
-      transactionType: contract.transactionType ?? null,
-      transactionStatus: null,
-      source: 'recurring',
+      status: this.resolveMovementStatus({
+        transactionStatus: null,
+        occurrenceStatus,
+      }),
+      direction: contract.transactionType ?? null,
+      source,
       category: contract.category
         ? { id: contract.category.id, name: contract.category.name }
         : undefined,
@@ -805,12 +835,27 @@ export class TransactionsService {
       contractType: 'RECURRING',
       occurrenceStatus,
       actions: this.resolveMovementActions({
-        source: 'recurring',
         occurrenceStatus,
         transactionStatus: null,
         hasContract: true,
+        contractType: 'RECURRING',
       }),
     };
+  }
+
+  private resolveMovementSource(params: {
+    transaction?: TransactionModel;
+    wallet?: { financialType?: WalletFinancialType | null } | null;
+  }): MovementSource {
+    if (params.transaction?.cardWalletId) {
+      return 'STATEMENT_PAYMENT';
+    }
+
+    if (params.wallet?.financialType === WalletFinancialType.CreditCard) {
+      return 'CREDIT_CARD';
+    }
+
+    return 'ACCOUNT';
   }
 
   private resolveOccurrenceStatus(
@@ -819,18 +864,45 @@ export class TransactionsService {
     return occurrenceStatus ?? OccurrenceStatusEnum.Scheduled;
   }
 
+  private resolveMovementStatus(params: {
+    transactionStatus?: TransactionStatus | null;
+    occurrenceStatus?: OccurrenceStatusEnum | null;
+  }): MovementStatus {
+    if (params.transactionStatus === TransactionStatus.Reversed) {
+      return 'REVERSED';
+    }
+
+    if (
+      params.occurrenceStatus === OccurrenceStatusEnum.Scheduled ||
+      params.occurrenceStatus === OccurrenceStatusEnum.Paused
+    ) {
+      return 'SCHEDULED';
+    }
+
+    if (
+      params.occurrenceStatus === OccurrenceStatusEnum.Posted ||
+      params.occurrenceStatus === OccurrenceStatusEnum.Closed
+    ) {
+      return 'PAID';
+    }
+
+    if (params.transactionStatus === TransactionStatus.Posted) {
+      return 'PAID';
+    }
+
+    return 'SCHEDULED';
+  }
+
   private resolveMovementActions(params: {
-    source: MovementSource;
     occurrenceStatus: OccurrenceStatusEnum | null;
     transactionStatus?: TransactionStatus | null;
     hasContract: boolean;
+    contractType: 'INSTALLMENT' | 'RECURRING' | null;
   }) {
     const isFuture = params.occurrenceStatus === OccurrenceStatusEnum.Scheduled;
     const isPosted = params.occurrenceStatus === OccurrenceStatusEnum.Posted;
-    const isRecurring = params.source === 'recurring';
-    const isContractOccurrence =
-      params.hasContract &&
-      (params.source === 'installment' || params.source === 'recurring');
+    const isRecurring = params.contractType === 'RECURRING';
+    const isContractOccurrence = params.hasContract && !!params.contractType;
 
     return {
       canMarkAsPaid: isContractOccurrence && isFuture,

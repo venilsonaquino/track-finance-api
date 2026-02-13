@@ -1,9 +1,9 @@
-import { TransactionStatus } from '../enums/transaction-status.enum';
 import { TransactionType } from '../enums/transaction-type.enum';
 import { OccurrenceStatusEnum } from 'src/contracts/enums/installment-occurrence-status.enum';
 
-export type MovementSource = 'transaction' | 'installment' | 'recurring';
+export type MovementSource = 'ACCOUNT' | 'CREDIT_CARD' | 'STATEMENT_PAYMENT';
 export type MovementContractType = 'INSTALLMENT' | 'RECURRING';
+export type MovementStatus = 'PAID' | 'SCHEDULED' | 'REVERSED';
 
 export class MovementActionsDto {
   canMarkAsPaid: boolean;
@@ -30,8 +30,8 @@ export class MovementItemDto {
   date: string;
   description: string;
   amount: number;
-  transactionType?: TransactionType | null;
-  transactionStatus?: TransactionStatus | null;
+  status: MovementStatus;
+  direction?: TransactionType | null;
   source: MovementSource;
   category?: MovementCategoryDto;
   wallet?: MovementWalletDto;
