@@ -948,6 +948,7 @@ describe('ContractsService', () => {
         contract: { categoryId: 'cat-1' },
       },
     ]);
+    categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
     transactionRepo.create.mockResolvedValueOnce({
       id: 'tx-stmt-1',
@@ -993,6 +994,7 @@ describe('ContractsService', () => {
         contract: { categoryId: 'cat-1' },
       },
     ]);
+    categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
 
     await expect(
@@ -1035,6 +1037,7 @@ describe('ContractsService', () => {
         status: ContractStatusEnum.Active,
       },
     ]);
+    categoryRepo.findOne.mockResolvedValueOnce({ id: 'cat-1' });
     transactionRepo.create.mockResolvedValueOnce({
       id: 'tx-stmt-1',
       amount: '69.90',
@@ -1063,6 +1066,37 @@ describe('ContractsService', () => {
       expect.any(Object),
     );
     expect(result.paymentTransaction.id).toBe('tx-stmt-1');
+  });
+
+  it('throws NotFoundException when statement payment category does not belong to user', async () => {
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'card-1',
+      name: 'Cartao XPTO',
+      dueDay: 12,
+      financialType: 'CREDIT_CARD',
+      paymentAccountWalletId: 'acc-1',
+    });
+    occurrenceRepo.findAll.mockResolvedValueOnce([
+      {
+        id: 'inst-1',
+        amount: '120.00',
+        installmentStatus: OccurrenceStatusEnum.Scheduled,
+        contract: { categoryId: 'cat-1' },
+      },
+    ]);
+    recurringOccurrenceRepo.findAll.mockResolvedValueOnce([]);
+    categoryRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.payCardStatement(
+        'card-1',
+        2026,
+        2,
+        { depositedDate: '2026-02-12', categoryId: 'cat-other-user' } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(transactionRepo.create).not.toHaveBeenCalled();
   });
 
 });

@@ -877,6 +877,12 @@ export class ContractsService {
         'categoryId is required when it cannot be inferred from statement items.',
       );
     }
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId, userId },
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found for user.');
+    }
 
     const paymentWallet = await this.walletRepo.findOne({
       where: { id: paymentWalletId, userId },
