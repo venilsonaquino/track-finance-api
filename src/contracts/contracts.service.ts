@@ -423,6 +423,81 @@ export class ContractsService {
     };
   }
 
+  async updateInstallmentOccurrenceAmount(
+    contractId: string,
+    installmentIndex: number,
+    amount: string,
+    userId: string,
+  ) {
+    if (!Number.isInteger(installmentIndex) || installmentIndex <= 0) {
+      throw new BadRequestException('installmentIndex must be a positive integer.');
+    }
+
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+
+    const occurrence = await this.occurrenceRepo.findOne({
+      where: { contractId, installmentIndex },
+    });
+    if (!occurrence) {
+      throw new NotFoundException('Occurrence not found.');
+    }
+    if (
+      occurrence.installmentStatus === OccurrenceStatusEnum.Posted ||
+      !!occurrence.transactionId
+    ) {
+      throw new BadRequestException(
+        'Occurrence already paid and cannot be edited.',
+      );
+    }
+
+    await occurrence.update({ amount: String(amount) });
+
+    return {
+      contractId,
+      occurrence: {
+        id: occurrence.id,
+        installmentIndex: occurrence.installmentIndex,
+        dueDate: occurrence.dueDate,
+        amount: String(occurrence.amount),
+        status: occurrence.installmentStatus,
+        transactionId: occurrence.transactionId ?? null,
+      },
+    };
+  }
+
+  async updateRecurringOccurrenceAmount(
+    contractId: string,
+    dueDate: string,
+    amount: string,
+    userId: string,
+  ) {
+    return this.upsertOccurrenceOverride(
+      contractId,
+      dueDate,
+      { amount },
+      userId,
+    );
+  }
+
+  async updateRecurringOccurrenceAmountAndFuture(
+    contractId: string,
+    dueDate: string,
+    amount: string,
+    userId: string,
+  ) {
+    return this.upsertOccurrenceOverride(
+      contractId,
+      dueDate,
+      { amount, applyToFuture: true },
+      userId,
+    );
+  }
+
   async getContractById(contractId: string, userId: string) {
     const contract = await this.recurringContractRepo.findOne({
       where: { id: contractId, userId },

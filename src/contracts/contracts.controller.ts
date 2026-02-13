@@ -14,6 +14,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { CreateRecurringContractDto } from './dtos/create-recurring-contract.dto';
 import { UpsertOccurrenceOverrideDto } from './dtos/upsert-occurrence-override.dto';
 import { PayInstallmentOccurrenceDto } from './dtos/pay-installment-occurrence.dto';
+import { UpdateOccurrenceAmountDto } from './dtos/update-occurrence-amount.dto';
 
 @Controller('contracts')
 @UseGuards(AuthGuard)
@@ -47,6 +48,51 @@ export class ContractsController {
       contractId,
       dueDate,
       dto,
+      user.id,
+    );
+  }
+
+  @Patch('installments/:contractId/occurrences/:installmentIndex/amount')
+  async updateInstallmentOccurrenceAmount(
+    @Param('contractId') contractId: string,
+    @Param('installmentIndex') installmentIndex: string,
+    @Body() dto: UpdateOccurrenceAmountDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.updateInstallmentOccurrenceAmount(
+      contractId,
+      Number(installmentIndex),
+      dto.amount,
+      user.id,
+    );
+  }
+
+  @Patch('recurring/:contractId/occurrences/:dueDate/amount')
+  async updateRecurringOccurrenceAmount(
+    @Param('contractId') contractId: string,
+    @Param('dueDate') dueDate: string,
+    @Body() dto: UpdateOccurrenceAmountDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.updateRecurringOccurrenceAmount(
+      contractId,
+      dueDate,
+      dto.amount,
+      user.id,
+    );
+  }
+
+  @Patch('recurring/:contractId/occurrences/:dueDate/amount/future')
+  async updateRecurringOccurrenceAmountAndFuture(
+    @Param('contractId') contractId: string,
+    @Param('dueDate') dueDate: string,
+    @Body() dto: UpdateOccurrenceAmountDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.updateRecurringOccurrenceAmountAndFuture(
+      contractId,
+      dueDate,
+      dto.amount,
       user.id,
     );
   }
