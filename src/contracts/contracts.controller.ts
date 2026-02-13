@@ -121,6 +121,30 @@ export class ContractsController {
     return this.service.closeRecurringContract(contractId, user.id);
   }
 
+  @Patch('installments/:contractId/pause')
+  async pauseInstallmentContract(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.pauseInstallmentContract(contractId, user.id);
+  }
+
+  @Patch('installments/:contractId/resume')
+  async resumeInstallmentContract(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.resumeInstallmentContract(contractId, user.id);
+  }
+
+  @Patch('installments/:contractId/close')
+  async closeInstallmentContract(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.closeInstallmentContract(contractId, user.id);
+  }
+
   @Patch('installments/:contractId/occurrences/:installmentIndex/pay')
   async payInstallment(
     @Param('contractId') contractId: string,

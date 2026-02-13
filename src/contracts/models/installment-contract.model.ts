@@ -99,6 +99,7 @@ export class InstallmentContractModel extends Model<InstallmentContractModel> {
     type: DataType.ENUM,
     values: [
       ContractStatusEnum.Active,
+      ContractStatusEnum.Paused,
       ContractStatusEnum.Cancelled,
       ContractStatusEnum.Finished,
     ],

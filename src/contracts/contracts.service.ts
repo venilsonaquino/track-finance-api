@@ -512,7 +512,22 @@ export class ContractsService {
       return { contract };
     }
 
-    await contract.update({ status: ContractStatusEnum.Paused });
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update({ status: ContractStatusEnum.Paused }, { transaction });
+      const today = formatIsoDateOnly(new Date());
+      await this.recurringOccurrenceRepo.update(
+        { status: OccurrenceStatusEnum.Paused },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            status: OccurrenceStatusEnum.Scheduled,
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
+    });
     return { contract };
   }
 
@@ -530,7 +545,22 @@ export class ContractsService {
       return { contract };
     }
 
-    await contract.update({ status: ContractStatusEnum.Active });
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update({ status: ContractStatusEnum.Active }, { transaction });
+      const today = formatIsoDateOnly(new Date());
+      await this.recurringOccurrenceRepo.update(
+        { status: OccurrenceStatusEnum.Scheduled },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            status: OccurrenceStatusEnum.Paused,
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
+    });
     return { contract };
   }
 
@@ -545,9 +575,139 @@ export class ContractsService {
       return { contract };
     }
 
-    await contract.update({
-      status: ContractStatusEnum.Cancelled,
-      endsAt: contract.endsAt ?? formatIsoDateOnly(new Date()),
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update(
+        {
+          status: ContractStatusEnum.Cancelled,
+          endsAt: contract.endsAt ?? formatIsoDateOnly(new Date()),
+        },
+        { transaction },
+      );
+      const today = formatIsoDateOnly(new Date());
+      await this.recurringOccurrenceRepo.update(
+        { status: OccurrenceStatusEnum.Cancelled },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            status: {
+              [Op.in]: [OccurrenceStatusEnum.Scheduled, OccurrenceStatusEnum.Paused],
+            },
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
+    });
+
+    return { contract };
+  }
+
+  async pauseInstallmentContract(contractId: string, userId: string) {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (
+      contract.status === ContractStatusEnum.Cancelled ||
+      contract.status === ContractStatusEnum.Finished
+    ) {
+      throw new BadRequestException('This contract cannot be paused.');
+    }
+    if (contract.status === ContractStatusEnum.Paused) {
+      return { contract };
+    }
+
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update({ status: ContractStatusEnum.Paused }, { transaction });
+      const today = formatIsoDateOnly(new Date());
+      await this.occurrenceRepo.update(
+        { installmentStatus: OccurrenceStatusEnum.Paused },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            installmentStatus: OccurrenceStatusEnum.Scheduled,
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
+    });
+
+    return { contract };
+  }
+
+  async resumeInstallmentContract(contractId: string, userId: string) {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (
+      contract.status === ContractStatusEnum.Cancelled ||
+      contract.status === ContractStatusEnum.Finished
+    ) {
+      throw new BadRequestException('This contract cannot be resumed.');
+    }
+    if (contract.status === ContractStatusEnum.Active) {
+      return { contract };
+    }
+
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update({ status: ContractStatusEnum.Active }, { transaction });
+      const today = formatIsoDateOnly(new Date());
+      await this.occurrenceRepo.update(
+        { installmentStatus: OccurrenceStatusEnum.Scheduled },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            installmentStatus: OccurrenceStatusEnum.Paused,
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
+    });
+
+    return { contract };
+  }
+
+  async closeInstallmentContract(contractId: string, userId: string) {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (
+      contract.status === ContractStatusEnum.Cancelled ||
+      contract.status === ContractStatusEnum.Finished
+    ) {
+      return { contract };
+    }
+
+    await this.sequelize.transaction(async (transaction) => {
+      await contract.update({ status: ContractStatusEnum.Cancelled }, { transaction });
+      const today = formatIsoDateOnly(new Date());
+      await this.occurrenceRepo.update(
+        { installmentStatus: OccurrenceStatusEnum.Cancelled },
+        {
+          where: {
+            contractId: contract.id,
+            dueDate: { [Op.gte]: today },
+            installmentStatus: {
+              [Op.in]: [OccurrenceStatusEnum.Scheduled, OccurrenceStatusEnum.Paused],
+            },
+            transactionId: null,
+          },
+          transaction,
+        },
+      );
     });
 
     return { contract };
@@ -796,6 +956,9 @@ export class ContractsService {
     if (!contract) {
       throw new NotFoundException('Contract not found.');
     }
+    if (contract.status !== ContractStatusEnum.Active) {
+      throw new BadRequestException('Only active contracts can be paid.');
+    }
 
     const occurrence = await this.occurrenceRepo.findOne({
       where: { contractId, installmentIndex },
@@ -806,6 +969,13 @@ export class ContractsService {
 
     if (occurrence.transactionId) {
       throw new BadRequestException('Occurrence already paid.');
+    }
+    if (
+      occurrence.installmentStatus === OccurrenceStatusEnum.Cancelled ||
+      occurrence.installmentStatus === OccurrenceStatusEnum.Skipped ||
+      occurrence.installmentStatus === OccurrenceStatusEnum.Paused
+    ) {
+      throw new BadRequestException('Occurrence is not payable.');
     }
     if (!contract.transactionType) {
       throw new BadRequestException(
@@ -901,7 +1071,8 @@ export class ContractsService {
     }
     if (
       existingOccurrence?.status === OccurrenceStatusEnum.Cancelled ||
-      existingOccurrence?.status === OccurrenceStatusEnum.Skipped
+      existingOccurrence?.status === OccurrenceStatusEnum.Skipped ||
+      existingOccurrence?.status === OccurrenceStatusEnum.Paused
     ) {
       throw new BadRequestException('Occurrence is not payable.');
     }
@@ -1014,6 +1185,10 @@ export class ContractsService {
     revisions: RecurringAmountRevision[],
     limit: number,
   ): Array<{ dueDate: string; amount: string }> {
+    if (contract.status !== ContractStatusEnum.Active) {
+      return [];
+    }
+
     const today = formatIsoDateOnly(new Date());
     const dueDateBuilder = createDueDateBuilder(
       contract.firstDueDate,
@@ -1048,6 +1223,7 @@ export class ContractsService {
           continue;
         }
         if (
+          override.status === OccurrenceStatusEnum.Paused ||
           override.status === OccurrenceStatusEnum.Skipped ||
           override.status === OccurrenceStatusEnum.Cancelled
         ) {
@@ -1101,7 +1277,7 @@ export class ContractsService {
   private resolveOccurrenceStatus(
     occurrenceStatus: OccurrenceStatusEnum | null | undefined,
     transactionStatus: TransactionStatus | null,
-  ): 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' {
+  ): 'PAID' | 'FUTURE' | 'REVERSED' | 'CANCELLED' | 'SKIPPED' | 'PAUSED' {
     if (occurrenceStatus === OccurrenceStatusEnum.Posted) {
       if (transactionStatus === TransactionStatus.Reversed) {
         return 'REVERSED';
@@ -1115,6 +1291,10 @@ export class ContractsService {
 
     if (occurrenceStatus === OccurrenceStatusEnum.Skipped) {
       return 'SKIPPED';
+    }
+
+    if (occurrenceStatus === OccurrenceStatusEnum.Paused) {
+      return 'PAUSED';
     }
 
     return 'FUTURE';

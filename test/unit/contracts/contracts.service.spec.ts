@@ -32,6 +32,7 @@ describe('ContractsService', () => {
     occurrenceRepo = {
       bulkCreate: jest.fn(),
       findOne: jest.fn(),
+      update: jest.fn(),
     };
     recurringContractRepo = {
       create: jest.fn(),
@@ -315,6 +316,7 @@ describe('ContractsService', () => {
       userId: 'user-1',
       categoryId: 'cat-1',
       walletId: 'wallet-1',
+      status: ContractStatusEnum.Active,
       installmentsCount: 3,
       description: 'Notebook',
       transactionType: 'EXPENSE',
@@ -400,9 +402,10 @@ describe('ContractsService', () => {
 
     const result = await service.pauseRecurringContract('rec-1', 'user-1');
 
-    expect(contract.update).toHaveBeenCalledWith({
-      status: ContractStatusEnum.Paused,
-    });
+    expect(contract.update).toHaveBeenCalledWith(
+      { status: ContractStatusEnum.Paused },
+      expect.any(Object),
+    );
     expect(result.contract).toBe(contract);
   });
 
@@ -416,9 +419,10 @@ describe('ContractsService', () => {
 
     const result = await service.resumeRecurringContract('rec-1', 'user-1');
 
-    expect(contract.update).toHaveBeenCalledWith({
-      status: ContractStatusEnum.Active,
-    });
+    expect(contract.update).toHaveBeenCalledWith(
+      { status: ContractStatusEnum.Active },
+      expect.any(Object),
+    );
     expect(result.contract).toBe(contract);
   });
 
@@ -437,7 +441,44 @@ describe('ContractsService', () => {
       expect.objectContaining({
         status: ContractStatusEnum.Cancelled,
       }),
+      expect.any(Object),
     );
+    expect(result.contract).toBe(contract);
+  });
+
+  it('pauses installment contract when active', async () => {
+    const contract = {
+      id: 'ins-1',
+      status: ContractStatusEnum.Active,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    };
+    contractRepo.findOne.mockResolvedValueOnce(contract);
+
+    const result = await service.pauseInstallmentContract('ins-1', 'user-1');
+
+    expect(contract.update).toHaveBeenCalledWith(
+      { status: ContractStatusEnum.Paused },
+      expect.any(Object),
+    );
+    expect(occurrenceRepo.update).toHaveBeenCalledTimes(1);
+    expect(result.contract).toBe(contract);
+  });
+
+  it('resumes installment contract when paused', async () => {
+    const contract = {
+      id: 'ins-1',
+      status: ContractStatusEnum.Paused,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    };
+    contractRepo.findOne.mockResolvedValueOnce(contract);
+
+    const result = await service.resumeInstallmentContract('ins-1', 'user-1');
+
+    expect(contract.update).toHaveBeenCalledWith(
+      { status: ContractStatusEnum.Active },
+      expect.any(Object),
+    );
+    expect(occurrenceRepo.update).toHaveBeenCalledTimes(1);
     expect(result.contract).toBe(contract);
   });
 

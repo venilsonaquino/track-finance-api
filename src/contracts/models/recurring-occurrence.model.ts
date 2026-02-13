@@ -55,6 +55,7 @@ export class RecurringOccurrenceModel extends Model<RecurringOccurrenceModel> {
     type: DataType.ENUM,
     values: [
       OccurrenceStatusEnum.Scheduled,
+      OccurrenceStatusEnum.Paused,
       OccurrenceStatusEnum.Posted,
       OccurrenceStatusEnum.Skipped,
       OccurrenceStatusEnum.Cancelled,
