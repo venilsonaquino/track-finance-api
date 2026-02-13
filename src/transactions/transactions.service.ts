@@ -793,17 +793,18 @@ export class TransactionsService {
     const isFuture = params.occurrenceStatus === OccurrenceStatusEnum.Scheduled;
     const isPosted = params.occurrenceStatus === OccurrenceStatusEnum.Posted;
     const isRecurring = params.source === 'recurring';
+    const isContractOccurrence =
+      params.hasContract &&
+      (params.source === 'installment' || params.source === 'recurring');
 
     return {
-      canMarkAsPaid:
-        params.hasContract &&
-        (params.source === 'installment' || params.source === 'recurring') &&
-        isFuture,
+      canMarkAsPaid: isContractOccurrence && isFuture,
       canReverse:
         !!params.transactionStatus &&
         params.transactionStatus === TransactionStatus.Posted &&
         (params.hasContract ? isPosted : true),
       canEditDueDate: false,
+      canAdjustAmount: isContractOccurrence && isFuture,
       canSkip: params.hasContract && isRecurring && isFuture,
       canViewContract: params.hasContract,
     };
