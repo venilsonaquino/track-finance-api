@@ -24,6 +24,11 @@ export class GetRecurringContractDetailsResponseDto {
     value: string;
     periodicity: string;
     billingDay: number;
+    valueChangedAt: string | null;
+    nextValueChange: {
+      effectiveFrom: string;
+      amount: string;
+    } | null;
     account: {
       id: string | null;
       name: string | null;

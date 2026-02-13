@@ -297,7 +297,8 @@ export class ContractsService {
     const existingOccurrence = await this.recurringOccurrenceRepo.findOne({
       where: { contractId: contract.id, dueDate },
     });
-    const applyToFuture = dto.applyToFuture === true;
+    const applyToFuture =
+      dto.applyToFuture === true || (dto.applyToFuture as any) === 'true';
     const isLegacySkipRequest =
       dto.amount === undefined &&
       dto.status === undefined &&
@@ -326,33 +327,9 @@ export class ContractsService {
     }
 
     if (applyToFuture) {
-      const effectiveFrom = dto.effectiveFrom ?? dueDate;
-      if (!parseIsoDateOnly(effectiveFrom)) {
-        throw new BadRequestException(
-          'Invalid effectiveFrom. Use YYYY-MM-DD.',
-        );
-      }
-      if (
-        !isDueDateOnSchedule(
-          contract.firstDueDate,
-          contract.installmentInterval,
-          effectiveFrom,
-        )
-      ) {
-        throw new BadRequestException(
-          'effectiveFrom is not valid for this contract schedule.',
-        );
-      }
-      const today = formatIsoDateOnly(new Date());
-      if (effectiveFrom < today) {
-        throw new BadRequestException(
-          'effectiveFrom cannot be in the past.',
-        );
-      }
-
       await this.sequelize.transaction(async (transaction) => {
         const existingRevision = await this.recurringRevisionRepo.findOne({
-          where: { contractId: contract.id, effectiveFrom },
+          where: { contractId: contract.id, effectiveFrom: dueDate },
           transaction,
         });
 
@@ -362,12 +339,26 @@ export class ContractsService {
           await this.recurringRevisionRepo.create(
             {
               contractId: contract.id,
-              effectiveFrom,
+              effectiveFrom: dueDate,
               amount: dto.amount!,
             },
             { transaction },
           );
         }
+
+        // Existing future scheduled occurrences should reflect the new default value.
+        await this.recurringOccurrenceRepo.update(
+          { amount: dto.amount! },
+          {
+            where: {
+              contractId: contract.id,
+              dueDate: { [Op.gte]: dueDate },
+              status: OccurrenceStatusEnum.Scheduled,
+              transactionId: null,
+            },
+            transaction,
+          },
+        );
       });
     }
 
@@ -598,6 +589,11 @@ export class ContractsService {
       3,
     );
     const nextChargeDate = upcomingGenerated[0]?.dueDate ?? null;
+    const today = formatIsoDateOnly(new Date());
+    const currentRevision = [...revisions]
+      .reverse()
+      .find((revision) => revision.effectiveFrom <= today);
+    const nextRevision = revisions.find((revision) => revision.effectiveFrom > today);
 
     const totalPaid = paidAll.reduce((sum, occ) => sum + Number(occ.amount), 0);
 
@@ -624,6 +620,13 @@ export class ContractsService {
           id: contract.category?.id ?? null,
           name: contract.category?.name ?? null,
         },
+        valueChangedAt: currentRevision?.effectiveFrom ?? contract.firstDueDate,
+        nextValueChange: nextRevision
+          ? {
+              effectiveFrom: nextRevision.effectiveFrom,
+              amount: String(nextRevision.amount),
+            }
+          : null,
         createdAt: contract.createdAt
           ? new Date(contract.createdAt).toISOString()
           : null,

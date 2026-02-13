@@ -40,6 +40,7 @@ describe('ContractsService', () => {
     recurringOccurrenceRepo = {
       findOne: jest.fn(),
       findAll: jest.fn(),
+      update: jest.fn(),
       create: jest.fn(),
     };
     recurringRevisionRepo = {
@@ -274,6 +275,38 @@ describe('ContractsService', () => {
 
     expect(existing.update).toHaveBeenCalledTimes(1);
     expect(result.occurrence.status).toBe(OccurrenceStatusEnum.Posted);
+  });
+
+  it('applies amount change to dueDate and future when applyToFuture is true', async () => {
+    recurringContractRepo.findOne.mockResolvedValueOnce({
+      id: 'contract-1',
+      firstDueDate: '2026-01-01',
+      installmentInterval: IntervalEnum.Monthly,
+      amount: '10.00',
+      status: ContractStatusEnum.Active,
+    });
+    recurringOccurrenceRepo.findOne.mockResolvedValueOnce(null);
+    recurringRevisionRepo.findOne.mockResolvedValueOnce(null);
+    recurringOccurrenceRepo.update.mockResolvedValueOnce([0]);
+
+    const result = await service.upsertOccurrenceOverride(
+      'contract-1',
+      '2026-03-01',
+      { amount: '50.00', applyToFuture: true } as any,
+      'user-1',
+    );
+
+    expect(recurringRevisionRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contractId: 'contract-1',
+        effectiveFrom: '2026-03-01',
+        amount: '50.00',
+      }),
+      expect.any(Object),
+    );
+    expect(recurringOccurrenceRepo.update).toHaveBeenCalledTimes(1);
+    expect(result.occurrence.amount).toBe('50.00');
+    expect(result.occurrence.source).toBe('GENERATED');
   });
 
   it('pays installment and creates transaction', async () => {
