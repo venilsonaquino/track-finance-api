@@ -390,6 +390,57 @@ describe('ContractsService', () => {
     expect(result.transaction.id).toBe('tx-2');
   });
 
+  it('pauses recurring contract when active', async () => {
+    const contract = {
+      id: 'rec-1',
+      status: ContractStatusEnum.Active,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    };
+    recurringContractRepo.findOne.mockResolvedValueOnce(contract);
+
+    const result = await service.pauseRecurringContract('rec-1', 'user-1');
+
+    expect(contract.update).toHaveBeenCalledWith({
+      status: ContractStatusEnum.Paused,
+    });
+    expect(result.contract).toBe(contract);
+  });
+
+  it('resumes recurring contract when paused', async () => {
+    const contract = {
+      id: 'rec-1',
+      status: ContractStatusEnum.Paused,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    };
+    recurringContractRepo.findOne.mockResolvedValueOnce(contract);
+
+    const result = await service.resumeRecurringContract('rec-1', 'user-1');
+
+    expect(contract.update).toHaveBeenCalledWith({
+      status: ContractStatusEnum.Active,
+    });
+    expect(result.contract).toBe(contract);
+  });
+
+  it('closes recurring contract and sets status cancelled', async () => {
+    const contract = {
+      id: 'rec-1',
+      status: ContractStatusEnum.Active,
+      endsAt: null,
+      update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
+    };
+    recurringContractRepo.findOne.mockResolvedValueOnce(contract);
+
+    const result = await service.closeRecurringContract('rec-1', 'user-1');
+
+    expect(contract.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: ContractStatusEnum.Cancelled,
+      }),
+    );
+    expect(result.contract).toBe(contract);
+  });
+
   it('pays recurring occurrence creating it on demand when it does not exist', async () => {
     recurringContractRepo.findOne.mockResolvedValueOnce({
       id: 'rec-1',

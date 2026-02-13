@@ -498,6 +498,61 @@ export class ContractsService {
     );
   }
 
+  async pauseRecurringContract(contractId: string, userId: string) {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (contract.status === ContractStatusEnum.Cancelled) {
+      throw new BadRequestException('Cancelled contract cannot be paused.');
+    }
+    if (contract.status === ContractStatusEnum.Paused) {
+      return { contract };
+    }
+
+    await contract.update({ status: ContractStatusEnum.Paused });
+    return { contract };
+  }
+
+  async resumeRecurringContract(contractId: string, userId: string) {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (contract.status === ContractStatusEnum.Cancelled) {
+      throw new BadRequestException('Cancelled contract cannot be resumed.');
+    }
+    if (contract.status === ContractStatusEnum.Active) {
+      return { contract };
+    }
+
+    await contract.update({ status: ContractStatusEnum.Active });
+    return { contract };
+  }
+
+  async closeRecurringContract(contractId: string, userId: string) {
+    const contract = await this.recurringContractRepo.findOne({
+      where: { id: contractId, userId },
+    });
+    if (!contract) {
+      throw new NotFoundException('Contract not found.');
+    }
+    if (contract.status === ContractStatusEnum.Cancelled) {
+      return { contract };
+    }
+
+    await contract.update({
+      status: ContractStatusEnum.Cancelled,
+      endsAt: contract.endsAt ?? formatIsoDateOnly(new Date()),
+    });
+
+    return { contract };
+  }
+
   async getContractById(contractId: string, userId: string) {
     const contract = await this.recurringContractRepo.findOne({
       where: { id: contractId, userId },
