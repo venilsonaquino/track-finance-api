@@ -8,6 +8,7 @@ import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occ
 import { RecurringOccurrenceModel } from 'src/contracts/models/recurring-occurrence.model';
 import { InstallmentContractModel } from 'src/contracts/models/installment-contract.model';
 import { RecurringContractModel } from 'src/contracts/models/recurring-contract.model';
+import { RecurringContractRevisionModel } from 'src/contracts/models/recurring-contract-revision.model';
 import { WalletsModule } from 'src/wallets/wallets.module';
 import { LoggerModule } from 'src/config/logging/logger.module';
 import { TransactionOfxService } from './transaction-ofx.service';
@@ -21,6 +22,7 @@ import { TransactionOfxService } from './transaction-ofx.service';
       RecurringOccurrenceModel,
       InstallmentContractModel,
       RecurringContractModel,
+      RecurringContractRevisionModel,
     ]),
     WalletsModule,
     LoggerModule,

@@ -21,6 +21,9 @@ import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { IntervalEnum } from '../enums/interval.enum';
 import { ContractStatusEnum } from '../enums/contract-status.enum';
 import { RecurringOccurrenceModel } from './recurring-occurrence.model';
+import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
+import { RecurringContractRevisionModel } from './recurring-contract-revision.model';
 
 @Table({ tableName: 'recurring_contracts' })
 export class RecurringContractModel extends Model<RecurringContractModel> {
@@ -106,6 +109,23 @@ export class RecurringContractModel extends Model<RecurringContractModel> {
   })
   status: ContractStatusEnum;
 
+  @Column({
+    field: 'transaction_type',
+    type: DataType.ENUM,
+    values: [TransactionType.Income, TransactionType.Expense],
+    allowNull: true,
+  })
+  transactionType?: TransactionType | null;
+
+  @Column({
+    field: 'transaction_status',
+    type: DataType.ENUM,
+    values: [TransactionStatus.Posted, TransactionStatus.Reversed],
+    allowNull: true,
+    defaultValue: TransactionStatus.Posted,
+  })
+  transactionStatus?: TransactionStatus | null;
+
   @BelongsTo(() => UserModel)
   user: UserEntity;
 
@@ -120,4 +140,10 @@ export class RecurringContractModel extends Model<RecurringContractModel> {
     as: 'occurrences',
   })
   occurrences: RecurringOccurrenceModel[];
+
+  @HasMany(() => RecurringContractRevisionModel, {
+    foreignKey: 'contractId',
+    as: 'revisions',
+  })
+  revisions: RecurringContractRevisionModel[];
 }

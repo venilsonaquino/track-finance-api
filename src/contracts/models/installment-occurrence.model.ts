@@ -65,7 +65,9 @@ export class InstallmentOccurrenceModel extends Model<InstallmentOccurrenceModel
     type: DataType.ENUM,
     values: [
       OccurrenceStatusEnum.Scheduled,
+      OccurrenceStatusEnum.Paused,
       OccurrenceStatusEnum.Posted,
+      OccurrenceStatusEnum.Skipped,
       OccurrenceStatusEnum.Cancelled,
     ],
     allowNull: false,

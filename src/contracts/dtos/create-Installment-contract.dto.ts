@@ -1,4 +1,5 @@
 import {
+  IsDefined,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -8,6 +9,8 @@ import {
   Min,
 } from 'class-validator';
 import { IntervalEnum } from '../enums/interval.enum';
+import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
+import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 
 export class CreateInstallmentContractDto {
   @IsString()
@@ -44,4 +47,16 @@ export class CreateInstallmentContractDto {
 
   @IsOptional()
   generateOccurrences?: boolean; // default true
+
+  @IsDefined()
+  @IsEnum(TransactionType, {
+    message: 'transactionType must be one of: INCOME, EXPENSE',
+  })
+  transactionType: TransactionType;
+
+  @IsOptional()
+  @IsEnum(TransactionStatus, {
+    message: 'transactionStatus must be one of: POSTED, REVERSED',
+  })
+  transactionStatus?: TransactionStatus;
 }
