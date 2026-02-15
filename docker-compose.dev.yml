@@ -14,16 +14,22 @@ services:
     environment:
       - NODE_ENV=development
       - DEBUG=true
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      - DB_NAME=trackfinan
     #command: node --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/main.ts #rodar com o debugger
-    command: npm run start:dev
+    command: sh -c "npm run migrate && npm run start:dev"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - trackfinannet
 
   postgres:
-    image: postgres
-    volumes:
+    image: postgres:17
+    volumes:  
       - track_finan_postgres:/var/lib/postgresql/data
     container_name: track_finan_postgres
     environment:
@@ -32,6 +38,11 @@ services:
       POSTGRES_DB: "trackfinan"
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d trackfinan"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     networks:
       - trackfinannet
 
