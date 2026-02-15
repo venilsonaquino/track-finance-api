@@ -19,6 +19,8 @@ import { AuthGuard } from 'src/common/guards/auth/auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { PayloadResponse } from 'src/auth/dto/login-response.dto';
 import { DateRangeDto } from './dto/date-range.dto';
+import { MovementsMonthQueryDto } from './dto/movements-month-query.dto';
+import { MovementsRangeQueryDto } from './dto/movements-range-query.dto';
 
 @UseGuards(AuthGuard)
 @Controller('transactions')
@@ -55,6 +57,22 @@ export class TransactionsController {
     return await this.transactionsService.findAllAndDateRange(id, query);
   }
 
+  @Get('movements/month')
+  async getMonthlyMovements(
+    @CurrentUser() user: PayloadResponse,
+    @Query() query: MovementsMonthQueryDto,
+  ) {
+    return await this.transactionsService.getMonthlyMovements(user.id, query);
+  }
+
+  @Get('movements/range')
+  async getRangeMovements(
+    @CurrentUser() user: PayloadResponse,
+    @Query() query: MovementsRangeQueryDto,
+  ) {
+    return await this.transactionsService.getRangeMovements(user.id, query);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
     const { user } = req;
@@ -73,6 +91,12 @@ export class TransactionsController {
       updateTransactionDto,
       user.id,
     );
+  }
+
+  @Post(':id/reverse')
+  async reverse(@Param('id') id: string, @Request() req) {
+    const { user } = req;
+    return await this.transactionsService.reverse(id, user.id);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

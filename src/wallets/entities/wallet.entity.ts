@@ -1,4 +1,5 @@
 import { ulid } from 'ulid';
+import MoneyHelper from '../helpers/money.helper';
 
 export class WalletEntity {
   id: string;
@@ -24,7 +25,7 @@ export class WalletEntity {
     this.name = params.name;
     this.description = params.description;
     this.walletType = params.walletType;
-    this.balance = params.balance;
+    this.balance = MoneyHelper.toCents(params.balance ?? 0);
     this.userId = params.userId;
     this.bankId = params.bankId;
   }

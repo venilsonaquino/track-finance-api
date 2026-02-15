@@ -24,6 +24,8 @@ RUN npm ci --omit=dev
 
 # Copia o build gerado
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/database ./database
+COPY --from=builder /app/.sequelizerc ./.sequelizerc
 
 EXPOSE 8080
 CMD ["node", "dist/main.js"]

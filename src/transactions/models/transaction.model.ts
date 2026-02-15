@@ -6,6 +6,7 @@ import {
   PrimaryKey,
   ForeignKey,
   BelongsTo,
+  HasOne,
 } from 'sequelize-typescript';
 import { CategoryEntity } from 'src/categories/entities/category.entity';
 import { CategoryModel } from 'src/categories/models/category.model';
@@ -13,7 +14,11 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { UserModel } from 'src/users/models/user.model';
 import { WalletEntity } from 'src/wallets/entities/wallet.entity';
 import { WalletModel } from 'src/wallets/models/wallet.model';
+import { TransactionStatus } from '../enums/transaction-status.enum';
+import { TransactionType } from '../enums/transaction-type.enum';
 import { ulid } from 'ulid';
+import { InstallmentOccurrenceModel } from 'src/contracts/models/installment-occurrence.model';
+import { TransactionOfxModel } from './transaction-ofx.model';
 
 @Table({
   tableName: 'transactions',
@@ -40,109 +45,65 @@ export class TransactionModel extends Model<TransactionModel> {
   description: string;
 
   @Column({
-    type: DataType.FLOAT,
+    type: DataType.DECIMAL(10, 2),
     allowNull: false,
   })
-  amount: number;
-
-  @Column({
-    field: 'fit_id',
-    type: DataType.STRING,
-    allowNull: true,
-    unique: true,
-  })
-  fitId: string;
-
-  @Column({
-    field: 'is_recurring',
-    type: DataType.BOOLEAN,
-    allowNull: true,
-  })
-  isRecurring: boolean;
-
-  @Column({
-    field: 'is_installment',
-    type: DataType.BOOLEAN,
-    allowNull: true,
-  })
-  isInstallment: boolean;
-
-  @Column({
-    field: 'installment_number',
-    type: DataType.INTEGER,
-    allowNull: true,
-  })
-  installmentNumber: number;
-
-  @Column({
-    field: 'installment_interval',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  installmentInterval: string;
-
-  @Column({
-    field: 'installment_end_date',
-    type: DataType.DATEONLY,
-    allowNull: true,
-  })
-  installmentEndDate: string;
-
-  @Column({
-    field: 'account_id',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  accountId: string;
-
-  @Column({
-    field: 'account_type',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  accountType: string;
-
-  @Column({
-    field: 'bank_id',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  bankId: string;
-
-  @Column({
-    field: 'bank_name',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  bankName: string;
-
-  @Column({
-    field: 'currency',
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  currency: string;
-
-  @Column({
-    field: 'transaction_date',
-    type: DataType.DATEONLY,
-    allowNull: true,
-  })
-  transactionDate: string;
+  amount: string;
 
   @Column({
     field: 'transaction_type',
-    type: DataType.STRING,
-    allowNull: true,
+    type: DataType.ENUM,
+    values: [
+      TransactionType.Income,
+      TransactionType.Expense,
+    ],
+    allowNull: false,
   })
-  transactionType: string;
+  transactionType: TransactionType;
 
   @Column({
     field: 'transaction_status',
-    type: DataType.STRING,
-    allowNull: true,
+    type: DataType.ENUM,
+    values: [TransactionStatus.Posted, TransactionStatus.Reversed],
+    allowNull: false,
+    defaultValue: TransactionStatus.Posted,
   })
-  transactionStatus: string;
+  transactionStatus: TransactionStatus;
+
+  @Column(DataType.VIRTUAL)
+  get fitId(): string | null {
+    return this.ofx?.fitId ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get accountId(): string | null {
+    return this.ofx?.accountId ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get accountType(): string | null {
+    return this.ofx?.accountType ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get bankId(): string | null {
+    return this.ofx?.bankId ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get bankName(): string | null {
+    return this.ofx?.bankName ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get currency(): string | null {
+    return this.ofx?.currency ?? null;
+  }
+
+  @Column(DataType.VIRTUAL)
+  get transactionDate(): string | null {
+    return this.ofx?.transactionDate ?? null;
+  }
 
   @ForeignKey(() => UserModel)
   @Column({
@@ -176,4 +137,16 @@ export class TransactionModel extends Model<TransactionModel> {
 
   @BelongsTo(() => WalletModel)
   wallet: WalletEntity;
+
+  @HasOne(() => InstallmentOccurrenceModel, {
+    foreignKey: 'transactionId',
+    as: 'installmentOccurrence',
+  })
+  installmentOccurrence?: InstallmentOccurrenceModel;
+
+  @HasOne(() => TransactionOfxModel, {
+    foreignKey: 'transactionId',
+    as: 'ofx',
+  })
+  ofx?: TransactionOfxModel;
 }

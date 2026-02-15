@@ -16,7 +16,7 @@ import { TransactionModel } from 'src/transactions/models/transaction.model';
 export class CategoryModel extends Model<CategoryModel> {
   @PrimaryKey
   @Column({
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     defaultValue: ulid,
   })
   id: string;
@@ -48,7 +48,7 @@ export class CategoryModel extends Model<CategoryModel> {
 
   @Column({
     field: 'user_id',
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     allowNull: true,
   })
   userId: string;
@@ -56,10 +56,10 @@ export class CategoryModel extends Model<CategoryModel> {
   @ForeignKey(() => BudgetGroupModel)
   @Column({
     field: 'budget_group_id',
-    type: 'VARCHAR(26)',
+    type: DataType.STRING(26),
     allowNull: true,
   })
-  budgetGroupId: string;
+  budgetGroupId: string | null;
 
   @BelongsTo(() => BudgetGroupModel)
   budgetGroup: BudgetGroupModel;

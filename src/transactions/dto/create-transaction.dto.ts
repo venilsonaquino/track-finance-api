@@ -2,23 +2,19 @@ import {
   IsDefined,
   IsNotEmpty,
   IsString,
-  IsDateString,
-  IsBoolean,
   IsNumber,
   IsOptional,
-  ValidateIf,
-  Validate,
-  IsIn,
-  Min,
+  IsEnum,
+  ValidateNested,
+  IsBoolean,
+  IsDateString,
 } from 'class-validator';
-import { TransactionTypeConstraint } from '../validators/validate-transaction-type.constraint';
+import { Type } from 'class-transformer';
+import { TransactionStatus } from '../enums/transaction-status.enum';
+import { TransactionType } from '../enums/transaction-type.enum';
+import { OfxDetailsDto } from './ofx-details.dto';
 
 export class CreateTransactionDto {
-  @IsNotEmpty()
-  @IsDefined()
-  @IsDateString()
-  depositedDate: string;
-
   @IsNotEmpty()
   @IsDefined()
   @IsString()
@@ -29,26 +25,18 @@ export class CreateTransactionDto {
   @IsNumber()
   amount: number;
 
-  @IsOptional()
-  @IsBoolean()
-  isRecurring: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isInstallment: boolean;
-
-  @ValidateIf((o) => o.isInstallment === true)
+  @IsNotEmpty()
   @IsDefined()
-  @IsNumber()
-  @Min(1)
-  installmentNumber: number | null;
-
-  @ValidateIf((o) => o.isInstallment === true)
-  @IsIn(['DAILY', 'MONTHLY', 'WEEKLY', 'YEARLY'], {
-    message:
-      'installmentInterval must be one of: DAILY, MONTHLY, WEEKLY, YEARLY',
+  @IsEnum(TransactionType, {
+    message: 'transactionType must be one of: INCOME, EXPENSE',
   })
-  installmentInterval: 'DAILY' | 'MONTHLY' | 'WEEKLY' | 'YEARLY' | null;
+  transactionType: TransactionType;
+
+  @IsOptional()
+  @IsEnum(TransactionStatus, {
+    message: 'transactionStatus must be one of: POSTED, REVERSED',
+  })
+  transactionStatus?: TransactionStatus;
 
   @IsNotEmpty()
   @IsDefined()
@@ -61,39 +49,15 @@ export class CreateTransactionDto {
   walletId: string;
 
   @IsNotEmpty()
-  @IsOptional()
-  @IsString()
-  fitId: string;
+  @IsDateString()
+  depositedDate: string;
 
   @IsOptional()
-  @IsString()
-  @IsOptional()
-  accountId: string;
+  @IsBoolean()
+  affectBalance?: boolean;
 
   @IsOptional()
-  @IsString()
-  accountType: string;
-
-  @IsOptional()
-  @IsString()
-  bankId: string;
-
-  @IsOptional()
-  @IsString()
-  bankName: string;
-
-  @IsOptional()
-  @IsString()
-  currency: string;
-
-  @IsOptional()
-  @IsString()
-  transactionDate: string;
-
-  @IsOptional()
-  @IsString()
-  transactionType: string;
-
-  @Validate(TransactionTypeConstraint)
-  transactionTypeCheck: boolean; // para testar o validator
+  @ValidateNested()
+  @Type(() => OfxDetailsDto)
+  ofx?: OfxDetailsDto;
 }

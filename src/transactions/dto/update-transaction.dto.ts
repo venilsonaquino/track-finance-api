@@ -1,4 +1,22 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateTransactionDto } from './create-transaction.dto';
+import { IsDateString, IsDefined, IsNotEmpty, IsString } from 'class-validator';
 
-export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {}
+export class UpdateTransactionDto {
+  @IsNotEmpty()
+  @IsDefined()
+  @IsString()
+  description: string;
+
+  @IsNotEmpty()
+  @IsDateString()
+  depositedDate: string;
+
+  @IsNotEmpty()
+  @IsDefined()
+  @IsString()
+  categoryId: string;
+
+  @IsNotEmpty()
+  @IsDefined()
+  @IsString()
+  walletId: string;
+}
