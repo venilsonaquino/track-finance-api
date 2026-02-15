@@ -21,7 +21,8 @@
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:status": "sequelize-cli db:migrate:status",
-    "migrate:generate": "sequelize-cli migration:generate"
+    "migrate:generate": "sequelize-cli migration:generate",
+    "migrate:reset": "sequelize-cli db:drop && sequelize-cli db:create && sequelize-cli db:migrate"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
