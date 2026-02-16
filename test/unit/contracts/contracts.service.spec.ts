@@ -638,14 +638,16 @@ describe('ContractsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('throws BadRequestException when paying installment without contract transactionType', async () => {
+  it('pays installment using EXPENSE even when contract transactionType is null', async () => {
     contractRepo.findOne.mockResolvedValueOnce({
       id: 'contract-1',
       userId: 'user-1',
       categoryId: 'cat-1',
       walletId: 'wallet-1',
+      status: ContractStatusEnum.Active,
       installmentsCount: 3,
       description: 'Notebook',
+      transactionStatus: 'POSTED',
       transactionType: null,
     });
     occurrenceRepo.findOne.mockResolvedValueOnce({
@@ -657,10 +659,28 @@ describe('ContractsService', () => {
       transactionId: null,
       update: jest.fn().mockImplementationOnce(() => Promise.resolve()),
     });
+    transactionRepo.create.mockResolvedValueOnce({
+      id: 'tx-9',
+      amount: '100.00',
+      transactionType: 'EXPENSE',
+    });
+    walletRepo.findOne.mockResolvedValueOnce({
+      id: 'wallet-1',
+      financialType: 'ACCOUNT',
+    });
 
-    await expect(
-      service.payInstallmentOccurrence('contract-1', 1, {} as any, 'user-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = await service.payInstallmentOccurrence(
+      'contract-1',
+      1,
+      {} as any,
+      'user-1',
+    );
+
+    expect(transactionRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ transactionType: 'EXPENSE' }),
+      expect.any(Object),
+    );
+    expect(result.transaction.id).toBe('tx-9');
   });
 
   it('returns generated and override occurrences for getContractOccurrences', async () => {

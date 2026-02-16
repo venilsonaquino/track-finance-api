@@ -110,8 +110,6 @@ export class ContractsService {
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
           status: ContractStatusEnum.Active,
-          transactionType: dto.transactionType,
-          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
         },
         { transaction: t },
       );
@@ -183,8 +181,6 @@ export class ContractsService {
           installmentInterval: dto.installmentInterval,
           firstDueDate: dto.firstDueDate,
           status: ContractStatusEnum.Active,
-          transactionType: dto.transactionType,
-          transactionStatus: dto.transactionStatus ?? TransactionStatus.Posted,
         },
         { transaction },
       );
@@ -1265,19 +1261,12 @@ export class ContractsService {
     ) {
       throw new BadRequestException('Occurrence is not payable.');
     }
-    if (!contract.transactionType) {
-      throw new BadRequestException(
-        'Contract transactionType is required to mark occurrence as paid.',
-      );
-    }
-
     const amount = String(occurrence.amount);
     const description = contract.description
       ? `${contract.description} • Parcela ${installmentIndex}/${contract.installmentsCount}`
       : `Parcela ${installmentIndex}/${contract.installmentsCount}`;
     const depositedDate = dto.depositedDate ?? occurrence.dueDate;
-    const transactionStatus =
-      contract.transactionStatus ?? TransactionStatus.Posted;
+    const transactionStatus = TransactionStatus.Posted;
 
     return this.sequelize.transaction(async (transaction) => {
       const created = await this.transactionRepo.create(
@@ -1285,7 +1274,7 @@ export class ContractsService {
           depositedDate,
           description,
           amount,
-          transactionType: contract.transactionType,
+          transactionType: TransactionType.Expense,
           transactionStatus,
           userId,
           categoryId: contract.categoryId,
@@ -1373,12 +1362,6 @@ export class ContractsService {
     ) {
       throw new BadRequestException('Occurrence is not payable.');
     }
-    if (!contract.transactionType) {
-      throw new BadRequestException(
-        'Contract transactionType is required to mark occurrence as paid.',
-      );
-    }
-
     const revisions = await this.listContractRevisionsUntil(contract.id, dueDate);
     const generatedAmount = this.resolveContractAmountAtDueDate(
       dueDate,
@@ -1388,8 +1371,7 @@ export class ContractsService {
     const amount = String(existingOccurrence?.amount ?? generatedAmount);
     const description = contract.description ?? `Recorrencia ${dueDate}`;
     const depositedDate = dto.depositedDate ?? dueDate;
-    const transactionStatus =
-      contract.transactionStatus ?? TransactionStatus.Posted;
+    const transactionStatus = TransactionStatus.Posted;
 
     return this.sequelize.transaction(async (transaction) => {
       const created = await this.transactionRepo.create(
@@ -1397,7 +1379,7 @@ export class ContractsService {
           depositedDate,
           description,
           amount,
-          transactionType: contract.transactionType,
+          transactionType: TransactionType.Expense,
           transactionStatus,
           userId,
           categoryId: contract.categoryId,

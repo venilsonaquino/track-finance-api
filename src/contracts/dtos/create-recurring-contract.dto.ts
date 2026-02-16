@@ -1,7 +1,5 @@
-import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
 import { IntervalEnum } from '../enums/interval.enum';
-import { TransactionType } from 'src/transactions/enums/transaction-type.enum';
-import { TransactionStatus } from 'src/transactions/enums/transaction-status.enum';
 
 export class CreateRecurringContractDto {
   @IsString()
@@ -33,16 +31,4 @@ export class CreateRecurringContractDto {
     message: 'firstDueDate must be in YYYY-MM-DD format',
   })
   firstDueDate: string;
-
-  @IsDefined()
-  @IsEnum(TransactionType, {
-    message: 'transactionType must be one of: INCOME, EXPENSE',
-  })
-  transactionType: TransactionType;
-
-  @IsOptional()
-  @IsEnum(TransactionStatus, {
-    message: 'transactionStatus must be one of: POSTED, REVERSED',
-  })
-  transactionStatus?: TransactionStatus;
 }

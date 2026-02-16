@@ -17,6 +17,7 @@ import { WalletFacade } from 'src/wallets/facades/wallet.facade';
 import { TransactionMapper } from './mappers/transaction.mapper';
 import { LoggerService } from 'src/config/logging/logger.service';
 import { TransactionStatus } from './enums/transaction-status.enum';
+import { TransactionType } from './enums/transaction-type.enum';
 import {
   MovementsMonthQueryDto,
   MovementsTimelineView,
@@ -775,7 +776,7 @@ export class TransactionsService {
         transactionStatus: null,
         occurrenceStatus,
       }),
-      direction: contract?.transactionType ?? null,
+      direction: TransactionType.Expense,
       source,
       category: contract?.category
         ? { id: contract.category.id, name: contract.category.name }
@@ -822,7 +823,7 @@ export class TransactionsService {
         transactionStatus: null,
         occurrenceStatus,
       }),
-      direction: contract.transactionType ?? null,
+      direction: TransactionType.Expense,
       source,
       category: contract.category
         ? { id: contract.category.id, name: contract.category.name }
