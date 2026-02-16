@@ -16,8 +16,8 @@ export class CreateWalletDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  description?: string;
 
   @IsString()
   @IsOptional()
@@ -48,5 +48,7 @@ export class CreateWalletDto {
   paymentAccountWalletId?: string;
 
   @IsNumber()
-  balance: number;
+  @Min(0)
+  @IsOptional()
+  balance?: number;
 }

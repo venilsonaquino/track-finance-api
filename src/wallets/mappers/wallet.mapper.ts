@@ -11,7 +11,7 @@ export class WalletMapper {
       description: model.description,
       walletType: model.walletType,
       financialType: model.financialType,
-      balance: model.balance,
+      balance: MoneyHelper.centsToAmount(model.balance),
       userId: model.userId,
       bankId: model.bankId,
       dueDay: model.dueDay,

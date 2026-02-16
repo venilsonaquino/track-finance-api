@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -26,31 +28,21 @@ export class WalletsService {
     createWalletDto: CreateWalletDto,
     userId: string,
   ): Promise<WalletResponseDto> {
-    try {
-      const financialType =
-        createWalletDto.financialType ?? WalletFinancialType.Account;
-      const normalizedBalance =
-        financialType === WalletFinancialType.CreditCard
-          ? 0
-          : createWalletDto.balance;
+    const walletEntity = WalletEntity.create({
+      ...createWalletDto,
+      userId,
+    });
 
+    await this.ensureValidPaymentAccountWallet(
+      walletEntity.paymentAccountWalletId,
+      userId,
+    );
+
+    try {
       this.logger.log(
-        `Creating wallet user=${userId} name=${createWalletDto.name} initialBalance=${normalizedBalance}`,
+        `Creating wallet user=${userId} name=${walletEntity.name} initialBalance=${MoneyHelper.centsToAmount(walletEntity.balance)}`,
         WalletsService.name,
       );
-
-      const walletEntity = new WalletEntity({
-        name: createWalletDto.name,
-        description: createWalletDto.description,
-        walletType: createWalletDto.walletType,
-        financialType,
-        balance: normalizedBalance,
-        userId: userId,
-        bankId: createWalletDto.bankId || null,
-        dueDay: createWalletDto.dueDay ?? null,
-        closingDay: createWalletDto.closingDay ?? null,
-        paymentAccountWalletId: createWalletDto.paymentAccountWalletId ?? null,
-      });
 
       const created = await this.walletModel.create(walletEntity);
       const response = WalletMapper.toResponse(created);
@@ -62,9 +54,13 @@ export class WalletsService {
 
       return response;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       this.logger.error(
         `Error creating wallet for user=${userId}`,
-        error?.stack,
+        error instanceof Error ? error.stack : String(error),
         WalletsService.name,
       );
       throw new InternalServerErrorException('Failed to create wallet');
@@ -90,30 +86,40 @@ export class WalletsService {
     updateWalletDto: UpdateWalletDto,
     userId: string,
   ): Promise<WalletResponseDto> {
-    const financialType =
-      updateWalletDto.financialType ?? WalletFinancialType.Account;
-    const normalizedBalance =
-      financialType === WalletFinancialType.CreditCard
-        ? 0
-        : updateWalletDto.balance;
+    const current = await this.walletModel.findOne({
+      where: { id, userId },
+    });
 
-    this.logger.log(
-      `Updating wallet id=${id} user=${userId} name=${updateWalletDto.name} balance=${normalizedBalance}`,
-      WalletsService.name,
+    if (!current) {
+      throw new NotFoundException(`Wallet with id ${id} not found`);
+    }
+
+    const walletEntity = WalletEntity.fromUpdate({
+      id,
+      userId,
+      current: {
+        name: current.name,
+        description: current.description,
+        walletType: current.walletType,
+        financialType: current.financialType,
+        balance: current.balance,
+        bankId: current.bankId,
+        dueDay: current.dueDay,
+        closingDay: current.closingDay,
+        paymentAccountWalletId: current.paymentAccountWalletId,
+      },
+      patch: updateWalletDto,
+    });
+
+    await this.ensureValidPaymentAccountWallet(
+      walletEntity.paymentAccountWalletId,
+      userId,
     );
 
-    const walletEntity = new WalletEntity({
-      name: updateWalletDto.name,
-      description: updateWalletDto.description,
-      walletType: updateWalletDto.walletType,
-      financialType,
-      balance: normalizedBalance,
-      userId: userId,
-      bankId: updateWalletDto.bankId || null,
-      dueDay: updateWalletDto.dueDay ?? null,
-      closingDay: updateWalletDto.closingDay ?? null,
-      paymentAccountWalletId: updateWalletDto.paymentAccountWalletId ?? null,
-    });
+    this.logger.log(
+      `Updating wallet id=${id} user=${userId} name=${walletEntity.name} balance=${MoneyHelper.centsToAmount(walletEntity.balance)}`,
+      WalletsService.name,
+    );
 
     const [affectedCount, updated] = await this.walletModel.update(
       walletEntity,
@@ -128,6 +134,29 @@ export class WalletsService {
     }
 
     return WalletMapper.toResponse(updated[0]);
+  }
+
+  private async ensureValidPaymentAccountWallet(
+    paymentAccountWalletId: string | null,
+    userId: string,
+  ) {
+    if (!paymentAccountWalletId) {
+      return;
+    }
+
+    const paymentWallet = await this.walletModel.findOne({
+      where: { id: paymentAccountWalletId, userId },
+    });
+
+    if (!paymentWallet) {
+      throw new BadRequestException('Payment account wallet not found for user.');
+    }
+
+    if (paymentWallet.financialType !== WalletFinancialType.Account) {
+      throw new BadRequestException(
+        'Payment account wallet must be an ACCOUNT wallet.',
+      );
+    }
   }
 
   async remove(id: string, userId: string): Promise<void> {
