@@ -742,7 +742,7 @@ export class ContractsService {
   ) {
     this.validateYearMonth(year, month);
     const cardWallet = await this.ensureCreditCardWallet(cardWalletId, userId);
-    const period = this.buildReferencePeriod(year, month);
+    const period = this.buildReferencePeriod(year, month, cardWallet.closingDay);
     const dueDate = this.resolveCardDueDate(year, month, cardWallet.dueDay);
 
     const {
@@ -790,6 +790,19 @@ export class ContractsService {
     const existingStatement = await this.cardStatementRepo.findOne({
       where: { cardWalletId, referenceMonth: period.referenceMonth },
     });
+    const statementStatus = this.resolveCardStatementStatus(
+      existingStatement?.status ?? CardStatementStatusEnum.Open,
+      dueDate,
+    );
+    if (
+      existingStatement &&
+      existingStatement.status === CardStatementStatusEnum.Open &&
+      statementStatus === CardStatementStatusEnum.Overdue
+    ) {
+      await existingStatement.update({ status: CardStatementStatusEnum.Overdue });
+    }
+    const shouldShowOpenSummary =
+      allItems.length > 0 && statementStatus === CardStatementStatusEnum.Open;
 
     return {
       statement: {
@@ -797,10 +810,11 @@ export class ContractsService {
         cardWalletId,
         cardWalletName: cardWallet.name,
         referenceMonth: period.referenceMonth,
+        billingMonth: period.referenceMonth,
         periodStart: period.periodStart,
         periodEnd: period.periodEnd,
         dueDate,
-        status: existingStatement?.status ?? CardStatementStatusEnum.Open,
+        status: statementStatus,
         totalAmount: totalAmount.toFixed(2),
         paymentWalletId:
           existingStatement?.paymentWalletId ??
@@ -809,6 +823,13 @@ export class ContractsService {
         paymentTransactionId: existingStatement?.paymentTransactionId ?? null,
       },
       items: allItems,
+      summary: shouldShowOpenSummary
+        ? {
+            totalAmount: totalAmount.toFixed(2),
+            dueDate,
+            dueInDays: this.diffDaysFromToday(dueDate),
+          }
+        : null,
     };
   }
 
@@ -821,7 +842,7 @@ export class ContractsService {
   ) {
     this.validateYearMonth(year, month);
     const cardWallet = await this.ensureCreditCardWallet(cardWalletId, userId);
-    const period = this.buildReferencePeriod(year, month);
+    const period = this.buildReferencePeriod(year, month, cardWallet.closingDay);
     const dueDate = this.resolveCardDueDate(year, month, cardWallet.dueDay);
 
     const {
@@ -979,7 +1000,10 @@ export class ContractsService {
       await this.walletFacade.adjustWalletBalance(paymentWalletId, userId, delta);
 
       return {
-        statement: statementPayload,
+        statement: {
+          ...statementPayload,
+          billingMonth: period.referenceMonth,
+        },
         paymentTransaction,
       };
     });
@@ -1476,11 +1500,29 @@ export class ContractsService {
     }
   }
 
-  private buildReferencePeriod(year: number, month: number) {
-    const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 0));
+  private buildReferencePeriod(
+    year: number,
+    month: number,
+    closingDay: number | null | undefined,
+  ) {
+    const resolvedClosingDay = closingDay ?? 1;
+    const currentMonthLastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const previousMonthLastDay = new Date(Date.UTC(year, month - 1, 0)).getUTCDate();
+    const currentClosingDay = Math.min(
+      Math.max(resolvedClosingDay, 1),
+      currentMonthLastDay,
+    );
+    const previousClosingDay = Math.min(
+      Math.max(resolvedClosingDay, 1),
+      previousMonthLastDay,
+    );
+
+    const referenceMonthDate = new Date(Date.UTC(year, month - 1, 1));
+    const startDate = new Date(Date.UTC(year, month - 2, previousClosingDay + 1));
+    const endDate = new Date(Date.UTC(year, month - 1, currentClosingDay));
+
     return {
-      referenceMonth: startDate.toISOString().slice(0, 10),
+      referenceMonth: referenceMonthDate.toISOString().slice(0, 10),
       periodStart: startDate.toISOString().slice(0, 10),
       periodEnd: endDate.toISOString().slice(0, 10),
     };
@@ -1495,6 +1537,32 @@ export class ContractsService {
     const monthLastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const safeDay = Math.min(Math.max(resolvedDueDay, 1), monthLastDay);
     return new Date(Date.UTC(year, month - 1, safeDay)).toISOString().slice(0, 10);
+  }
+
+  private diffDaysFromToday(targetDate: string): number {
+    const target = parseIsoDateOnly(targetDate);
+    const today = parseIsoDateOnly(formatIsoDateOnly(new Date()));
+    if (!target || !today) {
+      return 0;
+    }
+
+    const diffMs = target.getTime() - today.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  private resolveCardStatementStatus(
+    currentStatus: CardStatementStatusEnum,
+    dueDate: string,
+  ): CardStatementStatusEnum {
+    const today = formatIsoDateOnly(new Date());
+    if (
+      currentStatus === CardStatementStatusEnum.Open &&
+      dueDate < today
+    ) {
+      return CardStatementStatusEnum.Overdue;
+    }
+
+    return currentStatus;
   }
 
   private async ensureCreditCardWallet(cardWalletId: string, userId: string) {
