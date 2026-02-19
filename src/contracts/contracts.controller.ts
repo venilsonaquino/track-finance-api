@@ -192,6 +192,19 @@ export class ContractsController {
     return this.service.getRecurringContractDetails(contractId, user.id);
   }
 
+  @Get('cards/statements/:year/:month')
+  async getAllCardsStatements(
+    @Param('year') year: string,
+    @Param('month') month: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.service.getAllCardsStatementsSummary(
+      Number(year),
+      Number(month),
+      user.id,
+    );
+  }
+
   @Get('cards/:cardWalletId/statements/:year/:month')
   async getCardStatement(
     @Param('cardWalletId') cardWalletId: string,

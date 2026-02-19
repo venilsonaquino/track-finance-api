@@ -808,6 +808,7 @@ export class ContractsService {
       statement: {
         id: existingStatement?.id ?? null,
         cardWalletId,
+        bankId: cardWallet.bankId ?? null,
         cardWalletName: cardWallet.name,
         referenceMonth: period.referenceMonth,
         billingMonth: period.referenceMonth,
@@ -830,6 +831,42 @@ export class ContractsService {
             dueInDays: this.diffDaysFromToday(dueDate),
           }
         : null,
+    };
+  }
+
+  async getAllCardsStatementsSummary(year: number, month: number, userId: string) {
+    this.validateYearMonth(year, month);
+
+    const creditCardWallets = await this.walletRepo.findAll({
+      where: {
+        userId,
+        financialType: WalletFinancialType.CreditCard,
+      },
+      order: [['name', 'ASC']],
+    });
+
+    const statements = await Promise.all(
+      creditCardWallets.map(async (wallet) => {
+        const preview = await this.getCardStatementPreview(
+          wallet.id,
+          year,
+          month,
+          userId,
+        );
+
+        return {
+          statement: preview.statement,
+          summary: preview.summary,
+        };
+      }),
+    );
+
+    return {
+      period: {
+        year,
+        month,
+      },
+      items: statements,
     };
   }
 
