@@ -756,7 +756,7 @@ export class ContractsService {
         source: 'installment' as const,
         contractId: occ.contractId,
         dueDate: occ.dueDate,
-        amount: String(occ.amount),
+        amount: this.toMoneyNumber(occ.amount),
         status: occ.installmentStatus,
       })),
       ...recurringOccurrences.map((occ) => ({
@@ -764,7 +764,7 @@ export class ContractsService {
         source: 'recurring' as const,
         contractId: occ.contractId,
         dueDate: occ.dueDate,
-        amount: String(occ.amount),
+        amount: this.toMoneyNumber(occ.amount),
         status: occ.status,
       })),
       ...generatedRecurringOccurrences.map((occ) => ({
@@ -772,7 +772,7 @@ export class ContractsService {
         source: 'recurring' as const,
         contractId: occ.contractId,
         dueDate: occ.dueDate,
-        amount: String(occ.amount),
+        amount: this.toMoneyNumber(occ.amount),
         status: occ.status,
       })),
     ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -782,9 +782,8 @@ export class ContractsService {
       OccurrenceStatusEnum.Paused,
     ]);
     const payableItems = allItems.filter((item) => payableStatuses.has(item.status));
-    const totalAmount = payableItems.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0,
+    const totalAmount = this.toMoneyNumber(
+      payableItems.reduce((sum, item) => sum + item.amount, 0),
     );
 
     const existingStatement = await this.cardStatementRepo.findOne({
@@ -793,6 +792,7 @@ export class ContractsService {
     const statementStatus = this.resolveCardStatementStatus(
       existingStatement?.status ?? CardStatementStatusEnum.Open,
       dueDate,
+      totalAmount,
     );
     if (
       existingStatement &&
@@ -815,7 +815,7 @@ export class ContractsService {
         periodEnd: period.periodEnd,
         dueDate,
         status: statementStatus,
-        totalAmount: totalAmount.toFixed(2),
+        totalAmount,
         paymentWalletId:
           existingStatement?.paymentWalletId ??
           cardWallet.paymentAccountWalletId ??
@@ -825,7 +825,7 @@ export class ContractsService {
       items: allItems,
       summary: shouldShowOpenSummary
         ? {
-            totalAmount: totalAmount.toFixed(2),
+            totalAmount,
             dueDate,
             dueInDays: this.diffDaysFromToday(dueDate),
           }
@@ -1553,16 +1553,22 @@ export class ContractsService {
   private resolveCardStatementStatus(
     currentStatus: CardStatementStatusEnum,
     dueDate: string,
+    totalAmount: number,
   ): CardStatementStatusEnum {
     const today = formatIsoDateOnly(new Date());
     if (
       currentStatus === CardStatementStatusEnum.Open &&
+      totalAmount > 0 &&
       dueDate < today
     ) {
       return CardStatementStatusEnum.Overdue;
     }
 
     return currentStatus;
+  }
+
+  private toMoneyNumber(value: string | number): number {
+    return Math.round(Number(value) * 100) / 100;
   }
 
   private async ensureCreditCardWallet(cardWalletId: string, userId: string) {
