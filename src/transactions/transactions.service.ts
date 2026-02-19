@@ -307,11 +307,19 @@ export class TransactionsService {
     query: MovementsMonthQueryDto,
   ): Promise<MovementsMonthlyResponseDto> {
     const { start, end } = this.buildMonthRange(query.year, query.month);
+    const previousPeriod = this.buildPreviousMonthRange(query.year, query.month);
     const items = await this.buildMovementsForRange(userId, start, end, {
       view: query.view,
     });
+    const previousItems = await this.buildMovementsForRange(
+      userId,
+      previousPeriod.start,
+      previousPeriod.end,
+      { view: query.view },
+    );
 
     items.sort((a, b) => b.date.localeCompare(a.date));
+    previousItems.sort((a, b) => b.date.localeCompare(a.date));
 
     return {
       period: {
@@ -320,6 +328,7 @@ export class TransactionsService {
         start,
         end,
       },
+      summary: this.buildMovementsSummary(items, previousItems, previousPeriod),
       items,
     };
   }
@@ -329,6 +338,10 @@ export class TransactionsService {
     query: MovementsRangeQueryDto,
   ): Promise<MovementsMonthlyResponseDto> {
     this.validateDateRange(query.start_date, query.end_date, 5);
+    const previousPeriod = this.buildPreviousDateRange(
+      query.start_date,
+      query.end_date,
+    );
 
     const items = await this.buildMovementsForRange(
       userId,
@@ -340,8 +353,19 @@ export class TransactionsService {
         wallet_ids: query.wallet_ids,
       },
     );
+    const previousItems = await this.buildMovementsForRange(
+      userId,
+      previousPeriod.start,
+      previousPeriod.end,
+      {
+        view: query.view,
+        category_ids: query.category_ids,
+        wallet_ids: query.wallet_ids,
+      },
+    );
 
     items.sort((a, b) => b.date.localeCompare(a.date));
+    previousItems.sort((a, b) => b.date.localeCompare(a.date));
 
     return {
       period: {
@@ -350,6 +374,7 @@ export class TransactionsService {
         start: query.start_date,
         end: query.end_date,
       },
+      summary: this.buildMovementsSummary(items, previousItems, previousPeriod),
       items,
     };
   }
@@ -360,6 +385,176 @@ export class TransactionsService {
     const start = startDate.toISOString().slice(0, 10);
     const end = endDate.toISOString().slice(0, 10);
     return { start, end };
+  }
+
+  private buildPreviousMonthRange(year: number, month: number) {
+    const currentStart = new Date(Date.UTC(year, month - 1, 1));
+    const previousMonthDate = new Date(
+      Date.UTC(currentStart.getUTCFullYear(), currentStart.getUTCMonth() - 1, 1),
+    );
+    const previousYear = previousMonthDate.getUTCFullYear();
+    const previousMonth = previousMonthDate.getUTCMonth() + 1;
+    const range = this.buildMonthRange(previousYear, previousMonth);
+    return {
+      ...range,
+      label: this.formatMonthYearLabel(range.start),
+    };
+  }
+
+  private buildPreviousDateRange(start: string, end: string) {
+    const startDate = parseIsoDateOnly(start) ?? new Date(`${start}T00:00:00Z`);
+    const endDate = parseIsoDateOnly(end) ?? new Date(`${end}T00:00:00Z`);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const diffDays = Math.floor((endDate.getTime() - startDate.getTime()) / dayMs) + 1;
+
+    const previousEndDate = new Date(startDate.getTime() - dayMs);
+    const previousStartDate = new Date(previousEndDate.getTime() - (diffDays - 1) * dayMs);
+
+    const previousStart = previousStartDate.toISOString().slice(0, 10);
+    const previousEnd = previousEndDate.toISOString().slice(0, 10);
+
+    return {
+      start: previousStart,
+      end: previousEnd,
+      label: this.formatMonthYearLabel(previousStart),
+    };
+  }
+
+  private buildMovementsSummary(
+    currentItems: MovementItemDto[],
+    previousItems: MovementItemDto[],
+    previousPeriod: { start: string; end: string; label: string },
+  ) {
+    const current = this.calculateMovementTotals(currentItems);
+    const previous = this.calculateMovementTotals(previousItems);
+
+    return {
+      income: {
+        amount: current.income,
+        badge: this.buildDeltaBadge(
+          current.income,
+          previous.income,
+          'income',
+        ),
+      },
+      expense: {
+        amount: current.expense,
+        badge: this.buildDeltaBadge(
+          current.expense,
+          previous.expense,
+          'expense',
+        ),
+      },
+      balance: {
+        amount: current.balance,
+        badge: this.buildDeltaBadge(
+          current.balance,
+          previous.balance,
+          'balance',
+        ),
+      },
+    };
+  }
+
+  private calculateMovementTotals(items: MovementItemDto[]) {
+    let income = 0;
+    let expense = 0;
+    let balanceIncome = 0;
+    let balanceExpense = 0;
+
+    for (const item of items) {
+      if (item.direction === TransactionType.Income) {
+        income += Number(item.amount);
+        if (item.source !== 'CREDIT_CARD') {
+          balanceIncome += Number(item.amount);
+        }
+      } else if (item.direction === TransactionType.Expense) {
+        expense += Number(item.amount);
+        if (item.source !== 'CREDIT_CARD') {
+          balanceExpense += Number(item.amount);
+        }
+      }
+    }
+
+    income = this.normalizeMoney(income);
+    expense = this.normalizeMoney(expense);
+    const balance = this.normalizeMoney(balanceIncome - balanceExpense);
+
+    return { income, expense, balance };
+  }
+
+  private buildDeltaBadge(
+    current: number,
+    previous: number,
+    kind: 'income' | 'expense' | 'balance',
+  ) {
+    if (!Number.isFinite(previous)) {
+      return {
+        amount: 0,
+        trend: 'FLAT' as const,
+        reason: 'NO_BASELINE' as const,
+      };
+    }
+
+    if (previous === 0 && current === 0) {
+      return {
+        amount: 0,
+        trend: 'FLAT' as const,
+        reason: 'NO_CHANGE' as const,
+      };
+    }
+
+    if (previous === 0 && current !== 0) {
+      const diff = current;
+      const positive = diff > 0;
+      const reason =
+        kind === 'expense'
+          ? ('NEW_SPEND' as const)
+          : kind === 'income'
+            ? ('NEW_INCOME' as const)
+            : ('NEW_BALANCE' as const);
+
+      return {
+        amount: this.normalizeMoney(Math.abs(diff)),
+        trend: positive ? ('UP' as const) : ('DOWN' as const),
+        reason,
+      };
+    }
+
+    const diff = current - previous;
+    const positive = diff >= 0;
+
+    if (diff === 0) {
+      return {
+        amount: 0,
+        trend: 'FLAT' as const,
+        reason: 'NO_CHANGE' as const,
+      };
+    }
+
+    return {
+      amount: this.normalizeMoney(Math.abs(diff)),
+      trend: positive ? ('UP' as const) : ('DOWN' as const),
+      reason: positive
+        ? ('INCREASE_VS_PREVIOUS' as const)
+        : ('DECREASE_VS_PREVIOUS' as const),
+    };
+  }
+
+  private normalizeMoney(value: number): number {
+    return Math.round(Number(value) * 100) / 100;
+  }
+
+  private formatMonthYearLabel(date: string): string {
+    const parsed = parseIsoDateOnly(date);
+    if (!parsed) {
+      return 'período anterior';
+    }
+    return parsed.toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   }
 
   private async buildMovementsForRange(

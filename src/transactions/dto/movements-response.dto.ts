@@ -51,5 +51,52 @@ export class MovementsMonthlyResponseDto {
     start: string;
     end: string;
   };
+  summary: {
+    income: {
+      amount: number;
+      badge: {
+        trend: 'UP' | 'DOWN' | 'FLAT';
+        amount: number;
+        reason:
+          | 'NO_BASELINE'
+          | 'NO_CHANGE'
+          | 'NEW_SPEND'
+          | 'NEW_INCOME'
+          | 'NEW_BALANCE'
+          | 'INCREASE_VS_PREVIOUS'
+          | 'DECREASE_VS_PREVIOUS';
+      };
+    };
+    expense: {
+      amount: number;
+      badge: {
+        trend: 'UP' | 'DOWN' | 'FLAT';
+        amount: number;
+        reason:
+          | 'NO_BASELINE'
+          | 'NO_CHANGE'
+          | 'NEW_SPEND'
+          | 'NEW_INCOME'
+          | 'NEW_BALANCE'
+          | 'INCREASE_VS_PREVIOUS'
+          | 'DECREASE_VS_PREVIOUS';
+      };
+    };
+    balance: {
+      amount: number;
+      badge: {
+        trend: 'UP' | 'DOWN' | 'FLAT';
+        amount: number;
+        reason:
+          | 'NO_BASELINE'
+          | 'NO_CHANGE'
+          | 'NEW_SPEND'
+          | 'NEW_INCOME'
+          | 'NEW_BALANCE'
+          | 'INCREASE_VS_PREVIOUS'
+          | 'DECREASE_VS_PREVIOUS';
+      };
+    };
+  };
   items: MovementItemDto[];
 }
